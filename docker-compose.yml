@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: tourneyhub
+      POSTGRES_PASSWORD: tourneyhub
+      POSTGRES_DB: tourneyhub
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tourneyhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ws:
+    build: ./ws-server
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      CORS_ORIGIN: "http://localhost:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
