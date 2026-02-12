@@ -1,20 +1,24 @@
 import "server-only";
 
-const SOCKET_IO_SERVER_URL =
-  process.env.SOCKET_IO_SERVER_URL || "http://localhost:3001";
+import Pusher from "pusher";
+
+const pusher = new Pusher({
+  appId: process.env.SOKETI_APP_ID!,
+  key: process.env.SOKETI_APP_KEY!,
+  secret: process.env.SOKETI_APP_SECRET!,
+  host: process.env.SOKETI_HOST!,
+  port: process.env.SOKETI_PORT || "443",
+  useTLS: process.env.SOKETI_USE_TLS !== "false",
+});
 
 export async function emitToEvent(
   eventId: string,
   event: string,
   payload: unknown
 ) {
-  const res = await fetch(`${SOCKET_IO_SERVER_URL}/emit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ eventId, event, payload }),
-  });
-
-  if (!res.ok) {
-    console.error("Failed to emit to Socket.IO server:", await res.text());
+  try {
+    await pusher.trigger(`event.${eventId}`, event, payload);
+  } catch (err) {
+    console.error("Failed to emit to Soketi:", err);
   }
 }

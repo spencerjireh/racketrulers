@@ -1,5 +1,5 @@
 {
-  "name": "tourneyhub-ws-server",
+  "name": "racketrulers-ws-server",
   "version": "1.0.0",
   "private": true,
   "scripts": {
