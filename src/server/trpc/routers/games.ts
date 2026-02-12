@@ -282,6 +282,48 @@ export const gamesRouter = createTRPCRouter({
       return updated;
     }),
 
+  batchUpdateSchedule: protectedProcedure
+    .input(
+      z.object({
+        eventId: z.string(),
+        updates: z.array(
+          z.object({
+            gameId: z.string(),
+            scheduledAt: z.string().optional(),
+            locationId: z.string().nullable().optional(),
+            durationMinutes: z.number().int().min(1).optional(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+
+      const results = await Promise.all(
+        input.updates.map((update) => {
+          const data: Record<string, unknown> = {};
+          if (update.scheduledAt !== undefined)
+            data.scheduledAt = update.scheduledAt ? new Date(update.scheduledAt) : null;
+          if (update.locationId !== undefined)
+            data.locationId = update.locationId;
+          if (update.durationMinutes !== undefined)
+            data.durationMinutes = update.durationMinutes;
+
+          return ctx.prisma.game.update({
+            where: { id: update.gameId },
+            data,
+          });
+        })
+      );
+
+      emitToEvent(input.eventId, "schedule:updated", {
+        batchUpdate: true,
+        count: results.length,
+      }).catch(() => {});
+
+      return { updated: results.length };
+    }),
+
   resetScore: protectedProcedure
     .input(z.object({ id: z.string(), eventId: z.string() }))
     .mutation(async ({ ctx, input }) => {

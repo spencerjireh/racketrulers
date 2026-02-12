@@ -6,6 +6,8 @@ import { verifyEventOwnership, verifyCategoryOwnership } from "../helpers";
 import {
   generateRoundRobinGames,
   generateSingleElimGames,
+  generateDoubleElimGames,
+  generateSwissPairings,
 } from "@/server/lib/game-generation";
 
 export const roundsRouter = createTRPCRouter({
@@ -50,7 +52,7 @@ export const roundsRouter = createTRPCRouter({
         categoryId: z.string(),
         eventId: z.string(),
         name: z.string().min(1, "Name is required"),
-        type: z.enum(["ROUND_ROBIN", "SINGLE_ELIM"]),
+        type: z.enum(["ROUND_ROBIN", "SINGLE_ELIM", "DOUBLE_ELIM", "SWISS", "CUSTOM"]),
         drawsAllowed: z.boolean().optional(),
         config: z.record(z.string(), z.unknown()).optional(),
       })
@@ -202,7 +204,6 @@ export const roundsRouter = createTRPCRouter({
           (round.config as Record<string, unknown>)?.consolation_match === true;
         const games = generateSingleElimGames(teamIds, consolation);
 
-        // Create games sequentially to get IDs for feeder linking
         const createdIds: string[] = [];
         for (const g of games) {
           const created = await ctx.prisma.game.create({
@@ -218,6 +219,59 @@ export const roundsRouter = createTRPCRouter({
         }
 
         return { gamesCreated: createdIds.length };
+      }
+
+      if (round.type === "DOUBLE_ELIM") {
+        const teamIds = round.category.categoryTeams.map((ct) => ct.teamId);
+        if (teamIds.length < 2) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Need at least 2 teams for double elimination",
+          });
+        }
+
+        const resetMatch =
+          (round.config as Record<string, unknown>)?.reset_match !== false;
+        const games = generateDoubleElimGames(teamIds, resetMatch);
+
+        const createdIds: string[] = [];
+        for (const g of games) {
+          const created = await ctx.prisma.game.create({
+            data: {
+              team1Id: g.team1Id,
+              team2Id: g.team2Id,
+              roundPosition: g.roundPosition,
+              roundId: round.id,
+              status: "SCHEDULED",
+            },
+          });
+          createdIds.push(created.id);
+        }
+
+        return { gamesCreated: createdIds.length };
+      }
+
+      if (round.type === "SWISS") {
+        const teamIds = round.category.categoryTeams.map((ct) => ct.teamId);
+        if (teamIds.length < 2) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Need at least 2 teams for Swiss pairings",
+          });
+        }
+
+        const games = generateSwissPairings(teamIds);
+
+        const allGames = games.map((g) => ({
+          team1Id: g.team1Id,
+          team2Id: g.team2Id,
+          roundPosition: g.roundPosition,
+          roundId: round.id,
+          status: "SCHEDULED" as const,
+        }));
+
+        await ctx.prisma.game.createMany({ data: allGames });
+        return { gamesCreated: allGames.length };
       }
 
       throw new TRPCError({
@@ -245,5 +299,45 @@ export const roundsRouter = createTRPCRouter({
       }
 
       await ctx.prisma.game.deleteMany({ where: { roundId: input.id } });
+    }),
+
+  confirmResults: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        eventId: z.string(),
+        force: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+
+      const round = await ctx.prisma.round.findFirst({
+        where: { id: input.id, category: { eventId: input.eventId } },
+      });
+      if (!round) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const games = await ctx.prisma.game.findMany({
+        where: { roundId: input.id },
+      });
+
+      const incomplete = games.filter(
+        (g) => !["COMPLETED", "FORFEIT", "CANCELLED"].includes(g.status)
+      );
+
+      if (incomplete.length > 0 && !input.force) {
+        return {
+          confirmed: false,
+          incompleteCount: incomplete.length,
+          message: `${incomplete.length} game(s) are not yet completed. Use force to confirm anyway.`,
+        };
+      }
+
+      await ctx.prisma.round.update({
+        where: { id: input.id },
+        data: { confirmed: true },
+      });
+
+      return { confirmed: true, incompleteCount: 0 };
     }),
 });

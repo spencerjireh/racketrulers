@@ -66,6 +66,7 @@ export const eventsRouter = createTRPCRouter({
           endDate: end,
           timezone: input.timezone,
           ownerId: ctx.userId,
+          status: "DRAFT",
         },
       });
 
@@ -87,7 +88,7 @@ export const eventsRouter = createTRPCRouter({
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
       const event = await ctx.prisma.event.findFirst({
-        where: { slug: input.slug, deletedAt: null },
+        where: { slug: input.slug, deletedAt: null, status: { not: "DRAFT" } },
         include: {
           locations: true,
           categories: {
@@ -145,6 +146,13 @@ export const eventsRouter = createTRPCRouter({
             maxPoints: z.number().int().min(1).max(50),
           })
           .optional(),
+        scheduleConfig: z
+          .object({
+            slotDuration: z.number().int().min(5).max(120),
+            dayStartHour: z.number().int().min(0).max(23),
+            dayEndHour: z.number().int().min(1).max(24),
+          })
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -172,6 +180,8 @@ export const eventsRouter = createTRPCRouter({
         updateData.pointsConfig = data.pointsConfig;
       if (data.scoringConfig !== undefined)
         updateData.scoringConfig = data.scoringConfig;
+      if (data.scheduleConfig !== undefined)
+        updateData.scheduleConfig = data.scheduleConfig;
       if (data.startDate !== undefined)
         updateData.startDate = new Date(data.startDate);
       if (data.endDate !== undefined)
@@ -181,6 +191,118 @@ export const eventsRouter = createTRPCRouter({
         where: { id },
         data: updateData,
       });
+    }),
+
+  publish: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const event = await verifyEventOwnership(ctx.prisma, input.id, ctx.userId);
+
+      if (event.status !== "DRAFT") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Only draft events can be published",
+        });
+      }
+
+      // Validate event has minimum required setup
+      const [categoryCount, teamCount, gameCount] = await Promise.all([
+        ctx.prisma.category.count({ where: { eventId: input.id } }),
+        ctx.prisma.team.count({ where: { eventId: input.id } }),
+        ctx.prisma.game.count({
+          where: { round: { category: { eventId: input.id } } },
+        }),
+      ]);
+
+      if (categoryCount === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Event must have at least 1 category",
+        });
+      }
+      if (teamCount < 2) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Event must have at least 2 teams",
+        });
+      }
+      if (gameCount === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Games must be generated before publishing",
+        });
+      }
+
+      return ctx.prisma.event.update({
+        where: { id: input.id },
+        data: { status: "PUBLISHED" },
+      });
+    }),
+
+  applyTemplate: protectedProcedure
+    .input(
+      z.object({
+        eventId: z.string(),
+        template: z.enum(["round_robin", "rr_playoffs", "single_elim", "double_elim"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const event = await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+
+      if (event.status === "COMPLETED") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Cannot modify a completed event",
+        });
+      }
+
+      // Delete existing categories (cascade deletes rounds/games)
+      await ctx.prisma.category.deleteMany({ where: { eventId: input.eventId } });
+
+      const templateConfigs = {
+        round_robin: {
+          categoryName: "Main",
+          rounds: [{ name: "Round Robin", type: "ROUND_ROBIN" as const, order: 0 }],
+        },
+        rr_playoffs: {
+          categoryName: "Main",
+          rounds: [
+            { name: "Group Stage", type: "ROUND_ROBIN" as const, order: 0 },
+            { name: "Playoffs", type: "SINGLE_ELIM" as const, order: 1 },
+          ],
+        },
+        single_elim: {
+          categoryName: "Main",
+          rounds: [{ name: "Bracket", type: "SINGLE_ELIM" as const, order: 0 }],
+        },
+        double_elim: {
+          categoryName: "Main",
+          rounds: [{ name: "Bracket", type: "DOUBLE_ELIM" as const, order: 0 }],
+        },
+      };
+
+      const config = templateConfigs[input.template];
+
+      const category = await ctx.prisma.category.create({
+        data: {
+          name: config.categoryName,
+          eventId: input.eventId,
+          order: 0,
+        },
+      });
+
+      for (const round of config.rounds) {
+        await ctx.prisma.round.create({
+          data: {
+            name: round.name,
+            type: round.type,
+            order: round.order,
+            categoryId: category.id,
+          },
+        });
+      }
+
+      return { categoryId: category.id, template: input.template };
     }),
 
   complete: protectedProcedure
@@ -227,7 +349,10 @@ export const eventsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const now = new Date();
-      const where: Record<string, unknown> = { deletedAt: null };
+      const where: Record<string, unknown> = {
+        deletedAt: null,
+        status: { not: "DRAFT" },
+      };
 
       if (input.search) {
         where.name = { contains: input.search, mode: "insensitive" };
