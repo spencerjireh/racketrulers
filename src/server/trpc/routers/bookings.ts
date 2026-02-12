@@ -38,12 +38,12 @@ export const bookingsRouter = createTRPCRouter({
       const fromDate = new Date(input.from);
       const toDate = new Date(input.to);
 
-      // Max 4 weeks
-      const maxRange = 28 * 24 * 60 * 60 * 1000;
+      // Max 8 weeks
+      const maxRange = 56 * 24 * 60 * 60 * 1000;
       if (toDate.getTime() - fromDate.getTime() > maxRange) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Maximum 4-week range for slot calculation",
+          message: "Maximum 8-week range for slot calculation",
         });
       }
 

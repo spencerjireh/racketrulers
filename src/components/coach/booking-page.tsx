@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
+import { MonthCalendar } from "@/components/ui/month-calendar";
 import { toast } from "sonner";
 import { SlotPicker } from "./slot-picker";
 import { BookingConfirmation } from "./booking-confirmation";
@@ -26,6 +27,10 @@ export function BookingPage({ slug }: BookingPageProps) {
   const [message, setMessage] = useState("");
   const [confirmed, setConfirmed] = useState(false);
 
+  const now = useMemo(() => new Date(), []);
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth());
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+
   const { data: coach, isLoading: coachLoading } = useQuery(
     trpc.bookings.getCoachPublic.queryOptions({ slug })
   );
@@ -37,7 +42,7 @@ export function BookingPage({ slug }: BookingPageProps) {
 
   const to = useMemo(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 28);
+    d.setDate(d.getDate() + 56);
     return d.toISOString().split("T")[0];
   }, []);
 
@@ -75,7 +80,7 @@ export function BookingPage({ slug }: BookingPageProps) {
     );
   }
 
-  const availableDates = Object.keys(availableSlots ?? {}).sort();
+  const availableDateSet = new Set(Object.keys(availableSlots ?? {}));
   const slotsForDate = selectedDate
     ? (availableSlots?.[selectedDate] ?? [])
     : [];
@@ -109,39 +114,20 @@ export function BookingPage({ slug }: BookingPageProps) {
           <CardTitle>Select a Date</CardTitle>
         </CardHeader>
         <CardContent>
-          {availableDates.length > 0 ? (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-              {availableDates.map((date) => {
-                const d = new Date(date + "T12:00:00");
-                return (
-                  <Button
-                    key={date}
-                    variant={selectedDate === date ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedDate(date);
-                      setSelectedSlot(null);
-                    }}
-                    className="flex flex-col h-auto py-2"
-                  >
-                    <span className="text-xs">
-                      {d.toLocaleDateString([], { weekday: "short" })}
-                    </span>
-                    <span className="text-sm font-bold">
-                      {d.toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No available dates in the next 4 weeks.
-            </p>
-          )}
+          <MonthCalendar
+            month={currentMonth}
+            year={currentYear}
+            availableDates={availableDateSet}
+            selectedDate={selectedDate || null}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setSelectedSlot(null);
+            }}
+            onMonthChange={(m, y) => {
+              setCurrentMonth(m);
+              setCurrentYear(y);
+            }}
+          />
         </CardContent>
       </Card>
 
