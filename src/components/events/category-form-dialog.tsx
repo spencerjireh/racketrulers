@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -53,6 +54,7 @@ export function CategoryFormDialog({
           <DialogTitle>
             {initialData ? "Edit Category" : "Add Category"}
           </DialogTitle>
+          <DialogDescription>{initialData ? "Update category details." : "Create a new category for grouping teams."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

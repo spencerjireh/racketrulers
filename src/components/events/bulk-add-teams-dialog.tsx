@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -42,6 +43,7 @@ export function BulkAddTeamsDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Bulk Add Teams</DialogTitle>
+          <DialogDescription>Enter team names, one per line.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

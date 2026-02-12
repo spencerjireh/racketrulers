@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -73,6 +74,7 @@ export function TeamFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{initialData ? "Edit Team" : "Add Team"}</DialogTitle>
+          <DialogDescription>{initialData ? "Update team details." : "Add a new team to the event."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
