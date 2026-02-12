@@ -142,23 +142,41 @@ export const coachRouter = createTRPCRouter({
         status: z.enum(["CONFIRMED", "CANCELLED"]).optional(),
         from: z.string().optional(),
         to: z.string().optional(),
+        page: z.number().int().min(1).optional().default(1),
+        pageSize: z.number().int().min(1).max(50).optional().default(10),
       })
     )
     .query(async ({ ctx, input }) => {
       const profile = await ctx.prisma.coachProfile.findUnique({
         where: { userId: ctx.userId },
       });
-      if (!profile) return [];
+      if (!profile) {
+        return { bookings: [], totalCount: 0, totalPages: 0, currentPage: 1 };
+      }
 
-      return ctx.prisma.booking.findMany({
-        where: {
-          coachProfileId: profile.id,
-          ...(input.status ? { status: input.status } : {}),
-          ...(input.from ? { date: { gte: new Date(input.from) } } : {}),
-          ...(input.to ? { date: { lte: new Date(input.to) } } : {}),
-        },
-        orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      });
+      const where = {
+        coachProfileId: profile.id,
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.from ? { date: { gte: new Date(input.from) } } : {}),
+        ...(input.to ? { date: { lte: new Date(input.to) } } : {}),
+      };
+
+      const [bookings, totalCount] = await Promise.all([
+        ctx.prisma.booking.findMany({
+          where,
+          orderBy: [{ date: "desc" }, { startTime: "asc" }],
+          skip: (input.page - 1) * input.pageSize,
+          take: input.pageSize,
+        }),
+        ctx.prisma.booking.count({ where }),
+      ]);
+
+      return {
+        bookings,
+        totalCount,
+        totalPages: Math.ceil(totalCount / input.pageSize),
+        currentPage: input.page,
+      };
     }),
 
   cancelBooking: protectedProcedure
