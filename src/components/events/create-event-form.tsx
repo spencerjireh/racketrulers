@@ -80,7 +80,7 @@ export function CreateEventForm() {
         endDate,
         timezone,
       });
-      router.push(`/dashboard/events/${event.id}/manage/settings`);
+      router.push(`/dashboard/events/${event.id}/manage/details`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create event");
     }

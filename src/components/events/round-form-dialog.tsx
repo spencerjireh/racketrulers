@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -19,12 +20,14 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 
+type RoundType = "ROUND_ROBIN" | "SINGLE_ELIM" | "DOUBLE_ELIM" | "SWISS" | "CUSTOM";
+
 interface RoundFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: {
     name: string;
-    type: "ROUND_ROBIN" | "SINGLE_ELIM";
+    type: RoundType;
     drawsAllowed: boolean;
   }) => void;
   isPending: boolean;
@@ -37,9 +40,7 @@ export function RoundFormDialog({
   isPending,
 }: RoundFormDialogProps) {
   const [name, setName] = useState("");
-  const [type, setType] = useState<"ROUND_ROBIN" | "SINGLE_ELIM">(
-    "ROUND_ROBIN"
-  );
+  const [type, setType] = useState<RoundType>("ROUND_ROBIN");
   const [drawsAllowed, setDrawsAllowed] = useState(false);
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export function RoundFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Round</DialogTitle>
+          <DialogDescription>Configure the round settings.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -77,9 +79,7 @@ export function RoundFormDialog({
             <Label>Round Type</Label>
             <Select
               value={type}
-              onValueChange={(v) =>
-                setType(v as "ROUND_ROBIN" | "SINGLE_ELIM")
-              }
+              onValueChange={(v) => setType(v as RoundType)}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -89,6 +89,11 @@ export function RoundFormDialog({
                 <SelectItem value="SINGLE_ELIM">
                   Single Elimination
                 </SelectItem>
+                <SelectItem value="DOUBLE_ELIM">
+                  Double Elimination
+                </SelectItem>
+                <SelectItem value="SWISS">Swiss</SelectItem>
+                <SelectItem value="CUSTOM">Custom</SelectItem>
               </SelectContent>
             </Select>
           </div>

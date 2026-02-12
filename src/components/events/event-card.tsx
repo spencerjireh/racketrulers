@@ -7,7 +7,7 @@ interface EventCardProps {
   event: {
     id: string;
     name: string;
-    status: "PUBLISHED" | "COMPLETED";
+    status: "DRAFT" | "PUBLISHED" | "COMPLETED";
     startDate: Date;
     endDate: Date;
     _count: {
@@ -22,6 +22,20 @@ export function EventCard({ event }: EventCardProps) {
   const start = new Date(event.startDate);
   const end = new Date(event.endDate);
 
+  const statusLabel =
+    event.status === "DRAFT"
+      ? "Draft"
+      : event.status === "PUBLISHED"
+        ? "Active"
+        : "Completed";
+
+  const statusVariant =
+    event.status === "DRAFT"
+      ? "outline"
+      : event.status === "PUBLISHED"
+        ? "default"
+        : "secondary";
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between">
@@ -29,8 +43,8 @@ export function EventCard({ event }: EventCardProps) {
           <CardTitle className="text-lg">{event.name}</CardTitle>
           <p className="text-sm text-muted-foreground">Badminton Tournament</p>
         </div>
-        <Badge variant={event.status === "PUBLISHED" ? "default" : "secondary"}>
-          {event.status === "PUBLISHED" ? "Active" : "Completed"}
+        <Badge variant={statusVariant as "default" | "secondary" | "outline"}>
+          {statusLabel}
         </Badge>
       </CardHeader>
       <CardContent>
@@ -44,7 +58,9 @@ export function EventCard({ event }: EventCardProps) {
             </p>
           </div>
           <Button asChild size="sm">
-            <Link href={`/dashboard/events/${event.id}/manage`}>Manage</Link>
+            <Link href={`/dashboard/events/${event.id}/manage`}>
+              {event.status === "DRAFT" ? "Setup" : "Manage"}
+            </Link>
           </Button>
         </div>
       </CardContent>

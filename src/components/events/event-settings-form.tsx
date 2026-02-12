@@ -59,6 +59,18 @@ const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   maxPoints: 30,
 };
 
+interface ScheduleConfig {
+  slotDuration: number;
+  dayStartHour: number;
+  dayEndHour: number;
+}
+
+const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
+  slotDuration: 30,
+  dayStartHour: 8,
+  dayEndHour: 20,
+};
+
 interface EventSettingsFormProps {
   event: {
     id: string;
@@ -67,8 +79,9 @@ interface EventSettingsFormProps {
     startDate: Date;
     endDate: Date;
     timezone: string;
-    status: "PUBLISHED" | "COMPLETED";
+    status: "DRAFT" | "PUBLISHED" | "COMPLETED";
     scoringConfig?: ScoringConfig;
+    scheduleConfig?: ScheduleConfig;
   };
 }
 
@@ -89,6 +102,11 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
   const [totalSets, setTotalSets] = useState(String(parsedConfig.totalSets));
   const [deuceEnabled, setDeuceEnabled] = useState(parsedConfig.deuceEnabled);
   const [maxPoints, setMaxPoints] = useState(parsedConfig.maxPoints);
+
+  const schedConfig = (event.scheduleConfig ?? DEFAULT_SCHEDULE_CONFIG) as ScheduleConfig;
+  const [slotDuration, setSlotDuration] = useState(String(schedConfig.slotDuration));
+  const [dayStartHour, setDayStartHour] = useState(schedConfig.dayStartHour);
+  const [dayEndHour, setDayEndHour] = useState(schedConfig.dayEndHour);
 
   const updateEvent = useMutation(
     trpc.events.update.mutationOptions({
@@ -118,6 +136,11 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
         totalSets: parseInt(totalSets),
         deuceEnabled,
         maxPoints,
+      },
+      scheduleConfig: {
+        slotDuration: parseInt(slotDuration),
+        dayStartHour,
+        dayEndHour,
       },
     });
   }
@@ -243,6 +266,56 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
             <Label htmlFor="deuceEnabled" className="text-sm font-normal">
               Enable deuce (2-point lead required)
             </Label>
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule Config */}
+      <div className="space-y-4 rounded-lg border p-4">
+        <h3 className="text-sm font-semibold">Schedule Settings</h3>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label>Time Slot Duration</Label>
+            <Select
+              value={slotDuration}
+              onValueChange={setSlotDuration}
+              disabled={isCompleted}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+                <SelectItem value="45">45 minutes</SelectItem>
+                <SelectItem value="60">60 minutes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dayStartHour">Day Start Hour</Label>
+            <Input
+              id="dayStartHour"
+              type="number"
+              min={0}
+              max={23}
+              value={dayStartHour}
+              onChange={(e) => setDayStartHour(parseInt(e.target.value) || 8)}
+              disabled={isCompleted}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dayEndHour">Day End Hour</Label>
+            <Input
+              id="dayEndHour"
+              type="number"
+              min={1}
+              max={24}
+              value={dayEndHour}
+              onChange={(e) => setDayEndHour(parseInt(e.target.value) || 20)}
+              disabled={isCompleted}
+            />
           </div>
         </div>
       </div>
