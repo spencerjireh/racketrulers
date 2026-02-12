@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTRPC } from "@/lib/trpc/client";
@@ -24,6 +24,14 @@ import { Search, Trophy, Users } from "lucide-react";
 type EventStatus = "all" | "upcoming" | "in-progress" | "completed";
 
 export default function ExplorePage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>}>
+      <ExplorePageContent />
+    </Suspense>
+  );
+}
+
+function ExplorePageContent() {
   const trpc = useTRPC();
   const searchParams = useSearchParams();
   const defaultTab = searchParams.get("tab") === "coaches" ? "coaches" : "events";

@@ -9,7 +9,7 @@ interface PublicEventCardProps {
     name: string;
     slug: string;
     description: string | null;
-    status: "PUBLISHED" | "COMPLETED";
+    status: string;
     startDate: Date;
     endDate: Date;
     _count: {

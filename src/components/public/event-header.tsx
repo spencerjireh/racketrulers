@@ -29,9 +29,17 @@ export function EventHeader({
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">{name}</h1>
-        <Badge variant={status === "COMPLETED" ? "secondary" : "default"}>
-          {status === "COMPLETED" ? "Completed" : "Live"}
-        </Badge>
+        {(() => {
+          const now = new Date();
+          const displayStatus = status === "COMPLETED"
+            ? { label: "Completed", variant: "secondary" as const }
+            : start > now
+              ? { label: "Upcoming", variant: "outline" as const }
+              : end >= now
+                ? { label: "Live", variant: "default" as const }
+                : { label: "Completed", variant: "secondary" as const };
+          return <Badge variant={displayStatus.variant}>{displayStatus.label}</Badge>;
+        })()}
       </div>
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <span>Badminton</span>
