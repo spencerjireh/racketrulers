@@ -1,4 +1,4 @@
-# TourneyHub -- Product Requirements Document & Technical Specification
+# RacketRulers -- Product Requirements Document & Technical Specification
 
 **Version:** 3.0
 **Date:** February 11, 2026
@@ -10,7 +10,7 @@
 
 ### 1.1 Product Summary
 
-TourneyHub is a multi-sport tournament management platform with two core modules:
+RacketRulers is a badminton tournament management platform with two core modules:
 
 1. **Tournament Management** -- Organizers create, schedule, and run tournaments. Spectators view schedules, live scores, and standings in real time.
 2. **Coach Scheduler** -- Coaches publish their availability and share a booking link. Parents and players book sessions without needing an account.
@@ -31,7 +31,7 @@ The two modules are independent. A user can use one or both.
 - **Manual-first**: Automate only what is obviously and quickly automatable. Everything else is manual with a clear path to automation later.
 - **Organizer-first**: Every tournament feature should reduce organizer workload on tournament day.
 - **Real-time by default**: Scores, standings, and schedule changes propagate instantly via WebSocket.
-- **Sport-agnostic**: The data model and UI should not assume a specific sport. Scoring, tiebreakers, and points are configurable per event.
+- **Badminton-focused**: The data model and UI are designed specifically for badminton. Scoring uses configurable set-based rules (points per set, best-of-N sets, deuce rules). Matches support singles and doubles designation.
 - **Mobile-ready**: Organizers submit scores from the court/field. The entire admin flow must work on mobile via responsive web.
 
 ---
@@ -64,7 +64,6 @@ The two modules are independent. A user can use one or both.
 - SSR (all pages are client-side rendered; events are shared via direct links/QR codes, SEO is not a priority)
 - Self-service team registration (organizer adds teams manually)
 - Multi-admin / co-admin support
-- Set-based scoring (simple scoring only)
 - Dynamic game assignment (organizer manually assigns bracket games to time slots)
 - Automatic cascade recalculation (score edits require manual re-advancement)
 
@@ -93,7 +92,7 @@ MVP simplification: each event has exactly one owner (the creator). Multi-admin 
 ### 4.1 Event Management
 
 **Create Event (Minimal)**
-- Minimal creation form: event name, sport type, date range (single or multi-day), timezone (organizer's local timezone).
+- Minimal creation form: event name, date range (single or multi-day), timezone (organizer's local timezone).
 - After creation, organizer lands in the dashboard to configure everything else.
 
 **Event Dashboard**
@@ -208,14 +207,14 @@ Configured per category. Custom formulas are post-MVP.
 - Organizer configures time windows per day (start time, end time).
 
 **Locations**
-- Simple named list managed by the organizer (e.g., "Court 1", "Field A").
+- Simple named list of courts managed by the organizer (e.g., "Court 1", "Court 2"). UI labels display "Courts" instead of "Locations".
 
 ### 4.7 Score Entry & Results
 
 **Who can enter scores:** Owner only (single-admin MVP).
 
 **Score format:**
-- Simple score only: `{ "team1": 3, "team2": 1 }`
+- Set-based scoring: `{ setScores: [{ team1: 21, team2: 18 }, { team1: 15, team2: 21 }, { team1: 21, team2: 19 }] }`. `scoreTeam1`/`scoreTeam2` store sets won (e.g., 2 and 1) for standings calculations.
 
 **Score editing:**
 - Scores are always editable, even after bracket advancement.
@@ -273,6 +272,7 @@ Points are used in standings calculations for Round Robin and Swiss rounds.
 - Team data: team name, captain name, captain email, roster (list of player names).
 - Assign teams to categories.
 - No self-service registration in MVP.
+- Each game has a match type: Singles or Doubles.
 
 ### 4.13 Real-Time Updates (WebSocket)
 
@@ -315,15 +315,15 @@ Points are used in standings calculations for Round Robin and Swiss rounds.
 
 ## 5. Coach Scheduler
 
-A standalone module within TourneyHub. No connection to tournament features.
+A standalone module within RacketRulers. No connection to tournament features.
 
 ### 5.1 Overview
 
-Coaches create an account on TourneyHub and set their weekly recurring availability. They get a shareable booking link. Parents and players visit the link and book available time slots without needing an account.
+Coaches create an account on RacketRulers and set their weekly recurring availability. They get a shareable booking link. Parents and players visit the link and book available time slots without needing an account.
 
 ### 5.2 Coach Flow (Authenticated)
 
-- Coach signs up / logs in to TourneyHub.
+- Coach signs up / logs in to RacketRulers.
 - Sets weekly recurring availability (e.g., Monday 9am-12pm, Wednesday 2pm-6pm).
 - Configures session duration (default: 1 hour).
 - Gets a shareable public booking link (e.g., `yourdomain.com/coach/{username}`).
@@ -369,6 +369,7 @@ Event
   |-- has deleted_at (nullable, soft-delete)
   |-- has timezone (string, e.g., "America/Toronto")
   |-- has points_config (JSON)
+  |-- has scoring_config (JSON)
 
 Category
   |-- belongs to Event
@@ -400,6 +401,8 @@ Game
   |-- has status: scheduled | in_progress | completed | forfeit | cancelled
   |-- has score_team1 (integer, nullable)
   |-- has score_team2 (integer, nullable)
+  |-- has match_type: singles | doubles
+  |-- has set_scores (JSON, nullable)
   |-- has round_position (for bracket ordering)
   |-- has feeder_game_1_id (nullable, for bracket dependencies)
   |-- has feeder_game_2_id (nullable, for bracket dependencies)
@@ -443,9 +446,9 @@ Booking
 
 ### 6.2 Key Schema Decisions
 
-**Simple Scoring (dedicated columns on Game):**
+**Set-Based Scoring:**
 
-Scores are stored as two integer columns (`score_team1`, `score_team2`) rather than JSON. This simplifies queries for standings calculations and avoids JSON parsing overhead. Set-based scoring can be added post-MVP by introducing a `GameSet` table.
+Scores are stored as a `set_scores` JSON column containing an array of per-set scores (e.g., `[{ team1: 21, team2: 18 }, { team1: 15, team2: 21 }, { team1: 21, team2: 19 }]`). The `score_team1` and `score_team2` integer columns now represent sets won (e.g., 2 and 1) and are used for standings calculations. This approach keeps standings queries simple while supporting full set-level detail.
 
 **Points Config (JSON on Event):**
 ```json
@@ -519,7 +522,8 @@ trpc/
 
 | Operation | Input | Side Effects |
 |-----------|-------|--------------|
-| `events.create` | name, sport, dates, timezone | Creates event, generates slug |
+| `events.create` | name, dates, timezone | Creates event, generates slug |
+| `events.update` | eventId, name?, dates?, scoringConfig? | Updates event details and scoring configuration |
 | `games.submitScore` | gameId, scoreTeam1, scoreTeam2 | Recalc standings, broadcast WebSocket |
 | `games.editScore` | gameId, scoreTeam1, scoreTeam2 | Recalc standings, warn if advancement may be stale, broadcast |
 | `games.setForfeit` | gameId, winningTeamId | Update game status, recalc standings, broadcast |
