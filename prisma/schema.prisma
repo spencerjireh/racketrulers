@@ -76,6 +76,7 @@ model VerificationToken {
 // ─── Tournament Models ───────────────────────────────────────────────────────
 
 enum EventStatus {
+  DRAFT
   PUBLISHED
   COMPLETED
 
@@ -88,13 +89,14 @@ model Event {
   slug        String      @unique
   description String?
   bannerUrl   String?     @map("banner_url")
-  status      EventStatus @default(PUBLISHED)
+  status      EventStatus @default(DRAFT)
   timezone    String      @default("America/Toronto")
   startDate   DateTime    @map("start_date")
   endDate     DateTime    @map("end_date")
 
   pointsConfig  Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
-  scoringConfig Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
+  scoringConfig  Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
+  scheduleConfig Json @default("{\"slotDuration\": 30, \"dayStartHour\": 8, \"dayEndHour\": 20}") @map("schedule_config")
 
   ownerId String @map("owner_id")
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -152,6 +154,7 @@ model Round {
   advancementRules Json? @map("advancement_rules")
   config           Json? // e.g. { consolation_match: true, reset_match: true }
   drawsAllowed     Boolean @default(false) @map("draws_allowed")
+  confirmed        Boolean @default(false)
 
   categoryId String   @map("category_id")
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
