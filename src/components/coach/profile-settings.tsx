@@ -6,7 +6,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -14,9 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 const TIMEZONES = [
+  "Asia/Manila",
+  "Asia/Singapore",
+  "Asia/Kolkata",
+  "Asia/Tokyo",
+  "Pacific/Auckland",
+  "Australia/Sydney",
   "America/Toronto",
   "America/New_York",
   "America/Chicago",
@@ -25,9 +31,9 @@ const TIMEZONES = [
   "America/Vancouver",
   "Europe/London",
   "Europe/Paris",
-  "Asia/Tokyo",
-  "Australia/Sydney",
 ];
+
+const DURATION_PRESETS = [30, 45, 60, 90, 120];
 
 interface ProfileSettingsProps {
   profile: {
@@ -44,12 +50,20 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [duration, setDuration] = useState(profile.sessionDurationMinutes);
   const [timezone, setTimezone] = useState(profile.timezone);
+  const [copied, setCopied] = useState(false);
+  const [customDuration, setCustomDuration] = useState(
+    !DURATION_PRESETS.includes(profile.sessionDurationMinutes)
+  );
 
   useEffect(() => {
     setDisplayName(profile.displayName);
     setDuration(profile.sessionDurationMinutes);
     setTimezone(profile.timezone);
   }, [profile]);
+
+  useEffect(() => {
+    setCustomDuration(!DURATION_PRESETS.includes(profile.sessionDurationMinutes));
+  }, [profile.sessionDurationMinutes]);
 
   const updateProfile = useMutation(
     trpc.coach.updateProfile.mutationOptions({
@@ -70,57 +84,101 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
     });
   }
 
+  async function handleCopyUrl() {
+    const url = `${window.location.origin}/book/${profile.slug}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success("URL copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Profile Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
-          <div className="space-y-2">
-            <Label>Booking URL</Label>
-            <p className="text-sm text-muted-foreground">/book/{profile.slug}</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-name">Display Name</Label>
-            <Input
-              id="edit-name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-duration">Session Duration (minutes)</Label>
-            <Input
-              id="edit-duration"
-              type="number"
-              min={15}
-              max={480}
-              value={duration}
-              onChange={(e) => setDuration(parseInt(e.target.value) || 60)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Timezone</Label>
-            <Select value={timezone} onValueChange={setTimezone}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIMEZONES.map((tz) => (
-                  <SelectItem key={tz} value={tz}>
-                    {tz}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" disabled={updateProfile.isPending}>
-            {updateProfile.isPending ? "Saving..." : "Save Changes"}
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+      <div className="space-y-2">
+        <Label>Booking URL</Label>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md truncate">
+            /book/{profile.slug}
+          </code>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            onClick={handleCopyUrl}
+          >
+            {copied ? (
+              <Check className="h-4 w-4 text-green-600" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-name">Display Name</Label>
+        <Input
+          id="edit-name"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Session Duration (minutes)</Label>
+        <div className="flex flex-wrap gap-2">
+          {DURATION_PRESETS.map((d) => (
+            <Button
+              key={d}
+              type="button"
+              variant={!customDuration && duration === d ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setDuration(d);
+                setCustomDuration(false);
+              }}
+            >
+              {d}
+            </Button>
+          ))}
+          <Button
+            type="button"
+            variant={customDuration ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCustomDuration(true)}
+          >
+            Custom
+          </Button>
+        </div>
+        {customDuration && (
+          <Input
+            type="number"
+            min={15}
+            max={480}
+            value={duration}
+            onChange={(e) => setDuration(parseInt(e.target.value) || 60)}
+            className="w-32 mt-2"
+          />
+        )}
+      </div>
+      <div className="space-y-2">
+        <Label>Timezone</Label>
+        <Select value={timezone} onValueChange={setTimezone}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TIMEZONES.map((tz) => (
+              <SelectItem key={tz} value={tz}>
+                {tz}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Button type="submit" disabled={updateProfile.isPending}>
+        {updateProfile.isPending ? "Saving..." : "Save Changes"}
+      </Button>
+    </form>
   );
 }
