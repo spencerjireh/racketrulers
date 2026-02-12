@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import { toast } from "sonner";
 import { SlotPicker } from "./slot-picker";
 import { BookingConfirmation } from "./booking-confirmation";
@@ -56,7 +57,7 @@ export function BookingPage({ slug }: BookingPageProps) {
   );
 
   if (coachLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <LoadingState />;
   }
 
   if (!coach) {

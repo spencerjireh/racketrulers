@@ -2,6 +2,7 @@
 
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
+import { LoadingState } from "@/components/ui/loading-state";
 import { ProfileSetup } from "./profile-setup";
 import { ProfileSettings } from "./profile-settings";
 import { AvailabilityEditor } from "./availability-editor";
@@ -15,7 +16,7 @@ export function CoachDashboard() {
   );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <LoadingState />;
   }
 
   if (!profile) {

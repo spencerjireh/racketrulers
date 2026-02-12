@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GamesList } from "./games-list";
 import { StandingsTable } from "./standings-table";
 import { useRealtimeEvent } from "@/hooks/use-realtime-event";
+import { LoadingState } from "@/components/ui/loading-state";
 
 interface ScoringConfig {
   pointsPerSet: number;
@@ -90,7 +91,7 @@ export function ScoresManager({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-4">
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading games...</p>
+        <LoadingState text="Loading games..." />
       ) : grouped.size > 0 ? (
         Array.from(grouped.entries()).map(([catId, catGroup]) => (
           <Card key={catId}>

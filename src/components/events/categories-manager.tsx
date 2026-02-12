@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTRPC } from "@/lib/trpc/client";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { CategoryFormDialog } from "./category-form-dialog";
 import { CategoryTeamAssignment } from "./category-team-assignment";
+import { LoadingState } from "@/components/ui/loading-state";
 
 export function CategoriesManager({ eventId }: { eventId: string }) {
   const trpc = useTRPC();
@@ -24,7 +26,10 @@ export function CategoriesManager({ eventId }: { eventId: string }) {
     name: string;
     drawsAllowed: boolean;
   } | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = usePersistedState<string | null>(
+    `collapsible:categories:${eventId}`,
+    null
+  );
 
   const { data: categories, isLoading } = useQuery(
     trpc.categories.list.queryOptions({ eventId })
@@ -76,9 +81,7 @@ export function CategoriesManager({ eventId }: { eventId: string }) {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">
-            Loading categories...
-          </p>
+          <LoadingState text="Loading categories..." />
         ) : categories && categories.length > 0 ? (
           <div className="space-y-2">
             {categories.map((cat) => (

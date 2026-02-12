@@ -10,6 +10,7 @@ import { LocationsManager } from "@/components/events/locations-manager";
 import { DeleteEventDialog } from "@/components/events/delete-event-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
@@ -47,7 +48,7 @@ export default function DetailsPage({
   );
 
   if (isLoading || !event) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <LoadingState />;
   }
 
   const pointsConfig = event.pointsConfig as {

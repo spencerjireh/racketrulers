@@ -9,14 +9,19 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { RoundsManager } from "./rounds-manager";
 import { GamesList } from "./games-list";
 import { useRealtimeEvent } from "@/hooks/use-realtime-event";
+import { LoadingState } from "@/components/ui/loading-state";
 
 export function ScheduleView({ eventId }: { eventId: string }) {
   const trpc = useTRPC();
-  const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [expandedCat, setExpandedCat] = usePersistedState<string | null>(
+    `collapsible:schedule:${eventId}`,
+    null
+  );
 
   useRealtimeEvent(eventId);
 
@@ -52,7 +57,7 @@ export function ScheduleView({ eventId }: { eventId: string }) {
         </CardHeader>
         <CardContent>
           {catsLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <LoadingState />
           ) : categories && categories.length > 0 ? (
             <div className="space-y-2">
               {categories.map((cat) => (

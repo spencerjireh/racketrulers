@@ -19,13 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadingState } from "@/components/ui/loading-state";
 import { Search, Trophy, Users } from "lucide-react";
 
 type EventStatus = "all" | "upcoming" | "in-progress" | "completed";
 
 export default function ExplorePage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<LoadingState variant="centered" />}>
       <ExplorePageContent />
     </Suspense>
   );
@@ -130,9 +131,7 @@ function ExplorePageContent() {
             </div>
 
             {eventsLoading ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                Loading events...
-              </p>
+              <LoadingState text="Loading events..." variant="centered" />
             ) : eventsData && eventsData.events.length > 0 ? (
               <>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -192,9 +191,7 @@ function ExplorePageContent() {
             </div>
 
             {coachesLoading ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                Loading coaches...
-              </p>
+              <LoadingState text="Loading coaches..." variant="centered" />
             ) : coachesData && coachesData.coaches.length > 0 ? (
               <>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

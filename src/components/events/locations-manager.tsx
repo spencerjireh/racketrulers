@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { LoadingState } from "@/components/ui/loading-state";
 
 export function LocationsManager({ eventId }: { eventId: string }) {
   const trpc = useTRPC();
@@ -100,7 +101,7 @@ export function LocationsManager({ eventId }: { eventId: string }) {
         </form>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading courts...</p>
+          <LoadingState text="Loading courts..." />
         ) : locations && locations.length > 0 ? (
           <Table>
             <TableHeader>

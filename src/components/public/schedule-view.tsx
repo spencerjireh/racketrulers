@@ -3,6 +3,7 @@
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { GameCard } from "./game-card";
+import { LoadingState } from "@/components/ui/loading-state";
 
 interface PublicScheduleViewProps {
   eventId: string;
@@ -16,7 +17,7 @@ export function PublicScheduleView({ eventId }: PublicScheduleViewProps) {
   );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading schedule...</p>;
+    return <LoadingState text="Loading schedule..." />;
   }
 
   if (!games || games.length === 0) {

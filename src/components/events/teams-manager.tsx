@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { LoadingState } from "@/components/ui/loading-state";
 import { TeamFormDialog } from "./team-form-dialog";
 import { BulkAddTeamsDialog } from "./bulk-add-teams-dialog";
 
@@ -92,7 +93,7 @@ export function TeamsManager({ eventId }: { eventId: string }) {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading teams...</p>
+          <LoadingState text="Loading teams..." />
         ) : teams && teams.length > 0 ? (
           <Table>
             <TableHeader>

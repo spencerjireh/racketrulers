@@ -4,6 +4,7 @@ import { useTRPC } from "@/lib/trpc/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import { CategoriesManager } from "./categories-manager";
 import { toast } from "sonner";
 
@@ -58,7 +59,7 @@ export function FormatStep({ eventId }: FormatStepProps) {
   const hasCategories = categories && categories.length > 0;
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <LoadingState />;
   }
 
   return (

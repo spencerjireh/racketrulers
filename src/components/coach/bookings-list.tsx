@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { LoadingState } from "@/components/ui/loading-state";
 import { toast } from "sonner";
 
 export function BookingsList() {
@@ -41,7 +42,7 @@ export function BookingsList() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading bookings...</p>
+          <LoadingState text="Loading bookings..." />
         ) : bookings && bookings.length > 0 ? (
           <Table>
             <TableHeader>

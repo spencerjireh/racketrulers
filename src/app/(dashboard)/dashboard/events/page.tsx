@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy } from "lucide-react";
 import Link from "next/link";
 import { EventCard } from "@/components/events/event-card";
+import { LoadingState } from "@/components/ui/loading-state";
 
 export default function EventsPage() {
   const trpc = useTRPC();
@@ -27,7 +28,7 @@ export default function EventsPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading events...</p>
+        <LoadingState text="Loading events..." />
       ) : events && events.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           {events.map((event) => (

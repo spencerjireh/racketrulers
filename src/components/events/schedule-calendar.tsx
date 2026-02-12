@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -216,7 +217,7 @@ export function ScheduleCalendar({ eventId }: { eventId: string }) {
   const hasChanges = Object.keys(localChanges).length > 0;
 
   if (gamesLoading) {
-    return <p className="text-sm text-muted-foreground">Loading schedule...</p>;
+    return <LoadingState text="Loading schedule..." />;
   }
 
   if (!locations || locations.length === 0) {

@@ -3,12 +3,14 @@
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { RoundsManager } from "./rounds-manager";
 
@@ -18,14 +20,17 @@ interface RoundsStepProps {
 
 export function RoundsStep({ eventId }: RoundsStepProps) {
   const trpc = useTRPC();
-  const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [expandedCat, setExpandedCat] = usePersistedState<string | null>(
+    `collapsible:rounds-step:${eventId}`,
+    null
+  );
 
   const { data: categories, isLoading } = useQuery(
     trpc.categories.list.queryOptions({ eventId })
   );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <LoadingState />;
   }
 
   if (!categories || categories.length === 0) {

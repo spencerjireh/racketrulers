@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/loading-state";
 import { toast } from "sonner";
 
 interface ReviewStepProps {
@@ -43,7 +44,7 @@ export function ReviewStep({ eventId }: ReviewStepProps) {
   );
 
   if (!event) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <LoadingState />;
   }
 
   const categoryCount = categories?.length ?? 0;
