@@ -2,8 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -47,7 +45,7 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-/* ─── Light theme ─── */
+/* ─── Theme ─── */
 :root {
   --radius: 0.625rem;
   --background: oklch(0.985 0.002 80);
@@ -81,41 +79,6 @@
   --sidebar-accent-foreground: oklch(0.2 0.02 260);
   --sidebar-border: oklch(0.91 0.005 260);
   --sidebar-ring: oklch(0.48 0.16 150);
-}
-
-/* ─── Dark theme ─── */
-.dark {
-  --background: oklch(0.115 0.005 285);
-  --foreground: oklch(0.96 0.005 260);
-  --card: oklch(0.16 0.005 285);
-  --card-foreground: oklch(0.96 0.005 260);
-  --popover: oklch(0.16 0.005 285);
-  --popover-foreground: oklch(0.96 0.005 260);
-  --primary: oklch(0.87 0.22 128);
-  --primary-foreground: oklch(0.18 0.04 128);
-  --secondary: oklch(0.2 0.005 285);
-  --secondary-foreground: oklch(0.96 0.005 260);
-  --muted: oklch(0.22 0.005 285);
-  --muted-foreground: oklch(0.55 0 0);
-  --accent: oklch(0.2 0.005 285);
-  --accent-foreground: oklch(0.96 0.005 260);
-  --destructive: oklch(0.65 0.22 25);
-  --border: oklch(0.24 0.005 285);
-  --input: oklch(0.24 0.005 285);
-  --ring: oklch(0.87 0.22 128);
-  --chart-1: oklch(0.87 0.22 128);
-  --chart-2: oklch(0.8 0.15 60);
-  --chart-3: oklch(0.72 0.18 30);
-  --chart-4: oklch(0.7 0.15 230);
-  --chart-5: oklch(0.68 0.2 300);
-  --sidebar: oklch(0.13 0.005 285);
-  --sidebar-foreground: oklch(0.96 0.005 260);
-  --sidebar-primary: oklch(0.87 0.22 128);
-  --sidebar-primary-foreground: oklch(0.18 0.04 128);
-  --sidebar-accent: oklch(0.2 0.005 285);
-  --sidebar-accent-foreground: oklch(0.96 0.005 260);
-  --sidebar-border: oklch(0.24 0.005 285);
-  --sidebar-ring: oklch(0.87 0.22 128);
 }
 
 @layer base {
@@ -165,8 +128,3 @@
   box-shadow: 0 0 20px oklch(0.48 0.16 150 / 0.15);
 }
 
-.dark .glow-primary {
-  box-shadow:
-    0 0 24px oklch(0.87 0.22 128 / 0.2),
-    0 0 80px oklch(0.87 0.22 128 / 0.06);
-}
