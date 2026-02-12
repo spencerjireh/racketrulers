@@ -6,6 +6,6 @@ describe("smoke test", () => {
   });
 
   it("should handle string operations", () => {
-    expect("TourneyHub".toLowerCase()).toBe("tourneyhub");
+    expect("RacketRulers".toLowerCase()).toBe("racketrulers");
   });
 });

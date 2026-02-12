@@ -40,9 +40,9 @@ export default function LoginPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Organizer / Coach Sign in</h1>
       <p className="mt-1.5 text-muted-foreground">
-        Enter your credentials to access your account
+        Sign in to manage your events or coaching profile
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">

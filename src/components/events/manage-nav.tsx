@@ -10,7 +10,7 @@ const tabs = [
   { label: "Categories", segment: "categories" },
   { label: "Schedule", segment: "schedule" },
   { label: "Scores", segment: "scores" },
-  { label: "Locations", segment: "locations" },
+  { label: "Courts", segment: "locations" },
 ];
 
 export function ManageNav({ eventId }: { eventId: string }) {

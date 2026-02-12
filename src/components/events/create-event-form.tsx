@@ -15,27 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const SPORTS = [
-  "Basketball",
-  "Soccer",
-  "Volleyball",
-  "Tennis",
-  "Badminton",
-  "Table Tennis",
-  "Baseball",
-  "Softball",
-  "Football",
-  "Rugby",
-  "Cricket",
-  "Hockey",
-  "Futsal",
-  "Handball",
-  "Swimming",
-  "Track & Field",
-  "Esports",
-  "Other",
-];
-
 const TIMEZONES = [
   "America/New_York",
   "America/Chicago",
@@ -67,8 +46,6 @@ const TIMEZONES = [
 export function CreateEventForm() {
   const router = useRouter();
   const trpc = useTRPC();
-  const [sport, setSport] = useState("");
-  const [customSport, setCustomSport] = useState("");
   const [timezone, setTimezone] = useState("America/Toronto");
   const [error, setError] = useState("");
 
@@ -82,14 +59,9 @@ export function CreateEventForm() {
     const name = formData.get("name") as string;
     const startDate = formData.get("startDate") as string;
     const endDate = formData.get("endDate") as string;
-    const resolvedSport = sport === "Other" ? customSport : sport;
 
     if (!name.trim()) {
       setError("Event name is required");
-      return;
-    }
-    if (!resolvedSport.trim()) {
-      setError("Sport is required");
       return;
     }
     if (!startDate || !endDate) {
@@ -104,7 +76,6 @@ export function CreateEventForm() {
     try {
       const event = await createEvent.mutateAsync({
         name: name.trim(),
-        sport: resolvedSport.trim(),
         startDate,
         endDate,
         timezone,
@@ -123,30 +94,7 @@ export function CreateEventForm() {
 
       <div className="space-y-2">
         <Label htmlFor="name">Event Name</Label>
-        <Input id="name" name="name" placeholder="Spring Tournament 2026" />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Sport</Label>
-        <Select value={sport} onValueChange={setSport}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a sport" />
-          </SelectTrigger>
-          <SelectContent>
-            {SPORTS.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {sport === "Other" && (
-          <Input
-            placeholder="Enter sport name"
-            value={customSport}
-            onChange={(e) => setCustomSport(e.target.value)}
-          />
-        )}
+        <Input id="name" name="name" placeholder="Spring Badminton Open 2026" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

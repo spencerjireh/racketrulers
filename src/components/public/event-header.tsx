@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 
 interface EventHeaderProps {
   name: string;
-  sport: string;
   startDate: string | Date;
   endDate: string | Date;
   status: string;
@@ -10,7 +9,6 @@ interface EventHeaderProps {
 
 export function EventHeader({
   name,
-  sport,
   startDate,
   endDate,
   status,
@@ -36,7 +34,7 @@ export function EventHeader({
         </Badge>
       </div>
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>{sport}</span>
+        <span>Badminton</span>
         <span>{dateRange}</span>
       </div>
     </div>

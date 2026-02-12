@@ -11,8 +11,22 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "TourneyHub",
-  description: "Multi-sport tournament management platform",
+  title: {
+    default: "RacketRulers",
+    template: "%s | RacketRulers",
+  },
+  description: "RacketRulers -- the all-in-one badminton tournament management and coaching platform",
+  openGraph: {
+    title: "RacketRulers",
+    description: "RacketRulers -- the all-in-one badminton tournament management and coaching platform",
+    images: [{ url: "/logo.png", width: 800, height: 800 }],
+  },
+  twitter: {
+    card: "summary",
+    title: "RacketRulers",
+    description: "RacketRulers -- the all-in-one badminton tournament management and coaching platform",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({

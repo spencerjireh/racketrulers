@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { TourneyHubLogo } from "@/components/tourneyhub-logo";
+import { RacketRulersLogo } from "@/components/racketrulers-logo";
 import { Trophy, Zap, Calendar, Users, ArrowRight } from "lucide-react";
 
 const features = [
@@ -8,13 +8,7 @@ const features = [
     icon: Trophy,
     title: "Tournament Management",
     description:
-      "Create and manage multi-sport tournaments with round robin, Swiss, single elimination, and double elimination formats.",
-  },
-  {
-    icon: Zap,
-    title: "Real-time Scores",
-    description:
-      "Live score updates, automatic standings calculations, and instant bracket advancement -- all updating in real time.",
+      "Create and manage badminton tournaments with set-based scoring, singles and doubles support, round robin, Swiss, and elimination formats.",
   },
   {
     icon: Calendar,
@@ -23,10 +17,16 @@ const features = [
       "Publish your coaching availability and share a booking link. Parents and players book sessions without needing an account.",
   },
   {
-    icon: Users,
-    title: "Team Management",
+    icon: Zap,
+    title: "Real-time Scores",
     description:
-      "Manage teams, rosters, seedings, and category assignments. Handle multi-day events with drag-and-drop scheduling.",
+      "Live set-by-set score updates, automatic standings calculations, and instant bracket advancement -- all updating in real time.",
+  },
+  {
+    icon: Users,
+    title: "Court & Team Management",
+    description:
+      "Manage teams, rosters, seedings, and court assignments. Handle multi-day badminton events with drag-and-drop scheduling.",
   },
 ];
 
@@ -36,23 +36,20 @@ export default function HomePage() {
       {/* ─── Navigation ─── */}
       <header className="fixed top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <TourneyHubLogo variant="full" size={28} />
+          <RacketRulersLogo size={36} variant="full" />
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/login">Sign in</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="/signup">
-                Get started
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
+              <Link href="/signup">Sign up</Link>
             </Button>
           </div>
         </div>
       </header>
 
       {/* ─── Hero ─── */}
-      <section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden pt-16">
+      <section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden pb-16">
         {/* Grid pattern */}
         <div className="hero-grid absolute inset-0 text-foreground opacity-[0.04]" />
 
@@ -61,26 +58,15 @@ export default function HomePage() {
         <div className="pointer-events-none absolute right-1/4 top-2/3 h-[300px] w-[300px] rounded-full bg-chart-2/10 blur-[80px]" />
 
         <div className="relative mx-auto max-w-5xl px-6 text-center">
-          {/* Status pill */}
-          <div className="animate-fade-up mb-8 inline-flex items-center gap-2.5 rounded-full border border-border/60 bg-card/40 px-4 py-1.5 text-sm backdrop-blur-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-            </span>
-            <span className="text-muted-foreground">
-              Now with real-time score updates
-            </span>
-          </div>
-
           {/* Headline */}
           <h1
             className="animate-fade-up text-5xl font-bold tracking-tight sm:text-7xl lg:text-8xl"
             style={{ animationDelay: "0.1s" }}
           >
-            Run tournaments{" "}
             <span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">
-              like a pro.
-            </span>
+              RacketRulers.
+            </span>{" "}
+            Compete and coach like a pro.
           </h1>
 
           {/* Subtext */}
@@ -88,9 +74,9 @@ export default function HomePage() {
             className="animate-fade-up mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl"
             style={{ animationDelay: "0.2s" }}
           >
-            The all-in-one platform for managing multi-sport tournaments and
-            coaching sessions. Brackets, live scores, scheduling -- everything
-            you need.
+            The all-in-one platform for badminton coaching sessions and
+            tournaments. Set scoring, court management, live scores, brackets --
+            everything you need.
           </p>
 
           {/* CTAs */}
@@ -103,10 +89,14 @@ export default function HomePage() {
               className="glow-primary h-12 px-8 text-base"
               asChild
             >
-              <Link href="/signup">
-                Start for free
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              <Link href="/events?tab=coaches">Book a Coach</Link>
+            </Button>
+            <Button
+              size="lg"
+              className="glow-primary h-12 px-8 text-base"
+              asChild
+            >
+              <Link href="/events">See Event</Link>
             </Button>
             <Button
               size="lg"
@@ -114,38 +104,13 @@ export default function HomePage() {
               className="h-12 px-8 text-base"
               asChild
             >
-              <Link href="/login">Sign in</Link>
+              <Link href="/signup">
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </div>
 
-          {/* Stats */}
-          <div
-            className="animate-fade-up mt-20 flex items-center justify-center gap-8 sm:gap-16"
-            style={{ animationDelay: "0.4s" }}
-          >
-            <div className="text-center">
-              <div className="text-3xl font-bold tabular-nums sm:text-4xl">
-                500+
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Tournaments
-              </div>
-            </div>
-            <div className="h-10 w-px bg-border" />
-            <div className="text-center">
-              <div className="text-3xl font-bold tabular-nums sm:text-4xl">
-                2.5k+
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">Teams</div>
-            </div>
-            <div className="h-10 w-px bg-border" />
-            <div className="text-center">
-              <div className="text-3xl font-bold tabular-nums sm:text-4xl">
-                99.9%
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">Uptime</div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -160,8 +125,8 @@ export default function HomePage() {
               Everything you need to compete
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-              From bracket generation to live scoring, TourneyHub handles every
-              aspect of tournament management.
+              From coaching sessions to live set-by-set scoring, RacketRulers
+              handles every aspect of your badminton events.
             </p>
           </div>
 
@@ -195,22 +160,39 @@ export default function HomePage() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
           <div className="relative mx-auto max-w-6xl px-6 text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Ready to run your next tournament?
+              Ready to get started?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-              Join hundreds of organizers who trust TourneyHub to power their
-              competitive events.
+              Whether you coach, organize, or compete -- RacketRulers has
+              everything you need in one place.
             </p>
-            <Button
-              size="lg"
-              className="glow-primary mt-8 h-12 px-8 text-base"
-              asChild
-            >
-              <Link href="/signup">
-                Get started for free
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+              <Button
+                size="lg"
+                className="glow-primary h-12 px-8 text-base"
+                asChild
+              >
+                <Link href="/events?tab=coaches">Book a Coach</Link>
+              </Button>
+              <Button
+                size="lg"
+                className="glow-primary h-12 px-8 text-base"
+                asChild
+              >
+                <Link href="/events">See Event</Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 px-8 text-base"
+                asChild
+              >
+                <Link href="/signup">
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -218,9 +200,9 @@ export default function HomePage() {
       {/* ─── Footer ─── */}
       <footer className="border-t border-border/40 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
-          <TourneyHubLogo variant="full" size={22} />
+          <RacketRulersLogo size={28} />
           <p className="text-sm text-muted-foreground">
-            Multi-sport tournament management platform
+            Badminton tournament management and coaching platform
           </p>
         </div>
       </footer>

@@ -34,7 +34,7 @@ export function LocationsManager({ eventId }: { eventId: string }) {
           trpc.locations.list.queryFilter({ eventId })
         );
         setNewName("");
-        toast.success("Location added");
+        toast.success("Court added");
       },
       onError: (err) => toast.error(err.message),
     })
@@ -47,7 +47,7 @@ export function LocationsManager({ eventId }: { eventId: string }) {
           trpc.locations.list.queryFilter({ eventId })
         );
         setEditingId(null);
-        toast.success("Location updated");
+        toast.success("Court updated");
       },
       onError: (err) => toast.error(err.message),
     })
@@ -59,7 +59,7 @@ export function LocationsManager({ eventId }: { eventId: string }) {
         queryClient.invalidateQueries(
           trpc.locations.list.queryFilter({ eventId })
         );
-        toast.success("Location deleted");
+        toast.success("Court deleted");
       },
       onError: (err) => toast.error(err.message),
     })
@@ -84,23 +84,23 @@ export function LocationsManager({ eventId }: { eventId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Locations</CardTitle>
+        <CardTitle>Courts</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleAdd} className="flex gap-2">
           <Input
-            placeholder="Location name (e.g. Court 1)"
+            placeholder="Court name (e.g. Court 1)"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             className="max-w-sm"
           />
           <Button type="submit" disabled={createLocation.isPending}>
-            {createLocation.isPending ? "Adding..." : "Add Location"}
+            {createLocation.isPending ? "Adding..." : "Add Court"}
           </Button>
         </form>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading locations...</p>
+          <p className="text-sm text-muted-foreground">Loading courts...</p>
         ) : locations && locations.length > 0 ? (
           <Table>
             <TableHeader>
@@ -181,7 +181,7 @@ export function LocationsManager({ eventId }: { eventId: string }) {
           </Table>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No locations added yet. Add courts, fields, or venues above.
+            No courts added yet. Add courts above.
           </p>
         )}
       </CardContent>

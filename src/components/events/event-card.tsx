@@ -7,7 +7,6 @@ interface EventCardProps {
   event: {
     id: string;
     name: string;
-    sport: string;
     status: "PUBLISHED" | "COMPLETED";
     startDate: Date;
     endDate: Date;
@@ -28,7 +27,7 @@ export function EventCard({ event }: EventCardProps) {
       <CardHeader className="flex flex-row items-start justify-between">
         <div className="space-y-1">
           <CardTitle className="text-lg">{event.name}</CardTitle>
-          <p className="text-sm text-muted-foreground">{event.sport}</p>
+          <p className="text-sm text-muted-foreground">Badminton Tournament</p>
         </div>
         <Badge variant={event.status === "PUBLISHED" ? "default" : "secondary"}>
           {event.status === "PUBLISHED" ? "Active" : "Completed"}
@@ -41,7 +40,7 @@ export function EventCard({ event }: EventCardProps) {
               {start.toLocaleDateString()} - {end.toLocaleDateString()}
             </p>
             <p>
-              {event._count.teams} teams / {event._count.locations} locations
+              {event._count.teams} teams / {event._count.locations} courts
             </p>
           </div>
           <Button asChild size="sm">

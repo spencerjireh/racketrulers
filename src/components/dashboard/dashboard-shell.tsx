@@ -28,7 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { TourneyHubLogo } from "@/components/tourneyhub-logo";
+import { RacketRulersLogo } from "@/components/racketrulers-logo";
 import { cn } from "@/lib/utils";
 
 interface DashboardShellProps {
@@ -47,14 +47,14 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "My Events",
-    href: "/dashboard/events",
-    icon: Trophy,
-  },
-  {
     title: "Coach Scheduler",
     href: "/dashboard/coach",
     icon: Calendar,
+  },
+  {
+    title: "My Events",
+    href: "/dashboard/events",
+    icon: Trophy,
   },
 ];
 
@@ -101,11 +101,11 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 flex-col border-r border-border bg-card md:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r border-border bg-card md:flex">
         <div className="flex h-16 items-center border-b border-border px-5">
-          <TourneyHubLogo variant="full" size={26} />
+          <RacketRulersLogo size={36} />
         </div>
-        <div className="flex-1 p-4">
+        <div className="flex-1 overflow-y-auto p-4">
           <NavContent pathname={pathname} />
         </div>
         <Separator />
@@ -158,7 +158,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
             <SheetContent side="left" className="w-64 p-0">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <div className="flex h-16 items-center border-b border-border px-5">
-                <TourneyHubLogo variant="full" size={26} />
+                <RacketRulersLogo size={36} />
               </div>
               <div className="p-4" onClick={() => setMobileOpen(false)}>
                 <NavContent pathname={pathname} />
@@ -175,7 +175,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
               </div>
             </SheetContent>
           </Sheet>
-          <TourneyHubLogo variant="full" size={24} />
+          <RacketRulersLogo size={28} />
         </header>
 
         <main className="flex-1 bg-background p-6">{children}</main>
