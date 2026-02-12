@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -16,13 +17,27 @@ import { toast } from "sonner";
 import { GameStatusBadge } from "./game-status-badge";
 import { ScoreEntryDialog } from "./score-entry-dialog";
 
+interface SetScore {
+  team1: number;
+  team2: number;
+}
+
+interface ScoringConfig {
+  pointsPerSet: number;
+  totalSets: number;
+  deuceEnabled: boolean;
+  maxPoints: number;
+}
+
 interface Game {
   id: string;
   status: string;
+  matchType?: string;
   roundPosition: number | null;
   scheduledAt: string | Date | null;
   scoreTeam1: number | null;
   scoreTeam2: number | null;
+  setScores?: unknown;
   team1: { id: string; name: string } | null;
   team2: { id: string; name: string } | null;
   location: { id: string; name: string } | null;
@@ -33,12 +48,31 @@ interface GamesListProps {
   games: Game[];
   eventId: string;
   showPool?: boolean;
+  scoringConfig?: ScoringConfig;
 }
 
-export function GamesList({ games, eventId, showPool = false }: GamesListProps) {
+const DEFAULT_SCORING_CONFIG: ScoringConfig = {
+  pointsPerSet: 21,
+  totalSets: 3,
+  deuceEnabled: true,
+  maxPoints: 30,
+};
+
+function formatSetScores(setScores: SetScore[] | null | undefined): string {
+  if (!setScores || setScores.length === 0) return "";
+  return setScores.map((s) => `${s.team1}-${s.team2}`).join(", ");
+}
+
+export function GamesList({
+  games,
+  eventId,
+  showPool = false,
+  scoringConfig,
+}: GamesListProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [scoringGame, setScoringGame] = useState<Game | null>(null);
+  const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
 
   const invalidateGames = () => {
     queryClient.invalidateQueries(
@@ -100,9 +134,10 @@ export function GamesList({ games, eventId, showPool = false }: GamesListProps) 
             <TableHead>Team 1</TableHead>
             <TableHead className="text-center w-24">Score</TableHead>
             <TableHead>Team 2</TableHead>
+            <TableHead>Type</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Time</TableHead>
-            <TableHead>Location</TableHead>
+            <TableHead>Court</TableHead>
             <TableHead className="w-[120px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -120,13 +155,29 @@ export function GamesList({ games, eventId, showPool = false }: GamesListProps) 
               <TableCell className="font-medium">
                 {game.team1?.name ?? "TBD"}
               </TableCell>
-              <TableCell className="text-center font-mono">
-                {game.scoreTeam1 !== null && game.scoreTeam2 !== null
-                  ? `${game.scoreTeam1} - ${game.scoreTeam2}`
-                  : "- vs -"}
+              <TableCell className="text-center">
+                {game.scoreTeam1 !== null && game.scoreTeam2 !== null ? (
+                  <div>
+                    <div className="font-mono font-bold">
+                      {game.scoreTeam1} - {game.scoreTeam2}
+                    </div>
+                    {game.setScores != null && (
+                      <div className="text-xs text-muted-foreground">
+                        {formatSetScores(game.setScores as SetScore[])}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="font-mono">- vs -</span>
+                )}
               </TableCell>
               <TableCell className="font-medium">
                 {game.team2?.name ?? "TBD"}
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-xs">
+                  {game.matchType === "DOUBLES" ? "D" : "S"}
+                </Badge>
               </TableCell>
               <TableCell>
                 <GameStatusBadge status={game.status} />
@@ -178,9 +229,13 @@ export function GamesList({ games, eventId, showPool = false }: GamesListProps) 
         onOpenChange={(open) => {
           if (!open) setScoringGame(null);
         }}
-        onSubmit={(scores) => {
+        onSubmit={(data) => {
           if (scoringGame) {
-            updateScore.mutate({ id: scoringGame.id, eventId, ...scores });
+            updateScore.mutate({
+              id: scoringGame.id,
+              eventId,
+              setScores: data.setScores,
+            });
           }
         }}
         onForfeit={(winnerId) => {
@@ -204,14 +259,8 @@ export function GamesList({ games, eventId, showPool = false }: GamesListProps) 
         }}
         team1={scoringGame?.team1 ?? null}
         team2={scoringGame?.team2 ?? null}
-        currentScore={
-          scoringGame
-            ? {
-                scoreTeam1: scoringGame.scoreTeam1,
-                scoreTeam2: scoringGame.scoreTeam2,
-              }
-            : undefined
-        }
+        scoringConfig={config}
+        currentSetScores={scoringGame?.setScores as SetScore[] | null | undefined}
         isPending={updateScore.isPending || updateStatus.isPending}
       />
     </>

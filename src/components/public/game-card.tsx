@@ -1,10 +1,18 @@
+import { Badge } from "@/components/ui/badge";
 import { GameStatusBadge } from "@/components/events/game-status-badge";
+
+interface SetScore {
+  team1: number;
+  team2: number;
+}
 
 interface GameCardProps {
   team1Name: string;
   team2Name: string;
   scoreTeam1: number | null;
   scoreTeam2: number | null;
+  setScores?: SetScore[] | null;
+  matchType?: string;
   status: string;
   scheduledAt: string | Date | null;
   locationName: string | null;
@@ -16,6 +24,8 @@ export function GameCard({
   team2Name,
   scoreTeam1,
   scoreTeam2,
+  setScores,
+  matchType,
   status,
   scheduledAt,
   locationName,
@@ -26,6 +36,11 @@ export function GameCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {poolName && <span>{poolName}</span>}
+          {matchType && (
+            <Badge variant="outline" className="text-xs">
+              {matchType === "DOUBLES" ? "Doubles" : "Singles"}
+            </Badge>
+          )}
           {scheduledAt && (
             <span>
               {new Date(scheduledAt).toLocaleString([], {
@@ -51,6 +66,16 @@ export function GameCard({
           {team2Name}
         </span>
       </div>
+      {setScores && setScores.length > 0 && (
+        <div className="text-center text-xs text-muted-foreground">
+          {setScores.map((s, i) => (
+            <span key={i}>
+              {i > 0 && ", "}
+              {s.team1}-{s.team2}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

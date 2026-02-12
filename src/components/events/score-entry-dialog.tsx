@@ -11,17 +11,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface ScoringConfig {
+  pointsPerSet: number;
+  totalSets: number;
+  deuceEnabled: boolean;
+  maxPoints: number;
+}
+
+interface SetScore {
+  team1: number;
+  team2: number;
+}
+
 interface ScoreEntryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (scores: { scoreTeam1: number; scoreTeam2: number }) => void;
+  onSubmit: (data: { setScores: SetScore[] }) => void;
   onForfeit?: (winnerId: string) => void;
   onCancel?: () => void;
   team1: { id: string; name: string } | null;
   team2: { id: string; name: string } | null;
-  currentScore?: { scoreTeam1: number | null; scoreTeam2: number | null };
+  scoringConfig: ScoringConfig;
+  currentSetScores?: SetScore[] | null;
   isPending: boolean;
 }
+
+const DEFAULT_CONFIG: ScoringConfig = {
+  pointsPerSet: 21,
+  totalSets: 3,
+  deuceEnabled: true,
+  maxPoints: 30,
+};
 
 export function ScoreEntryDialog({
   open,
@@ -31,65 +51,162 @@ export function ScoreEntryDialog({
   onCancel,
   team1,
   team2,
-  currentScore,
+  scoringConfig = DEFAULT_CONFIG,
+  currentSetScores,
   isPending,
 }: ScoreEntryDialogProps) {
-  const [score1, setScore1] = useState("");
-  const [score2, setScore2] = useState("");
+  const config = scoringConfig ?? DEFAULT_CONFIG;
+  const [sets, setSets] = useState<{ t1: string; t2: string }[]>([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (open) {
-      setScore1(currentScore?.scoreTeam1?.toString() ?? "");
-      setScore2(currentScore?.scoreTeam2?.toString() ?? "");
+      setError("");
+      if (currentSetScores && currentSetScores.length > 0) {
+        setSets(
+          currentSetScores.map((s) => ({
+            t1: s.team1.toString(),
+            t2: s.team2.toString(),
+          }))
+        );
+      } else {
+        // Initialize with empty sets
+        setSets(
+          Array.from({ length: config.totalSets }, () => ({ t1: "", t2: "" }))
+        );
+      }
     }
-  }, [open, currentScore]);
+  }, [open, currentSetScores, config.totalSets]);
+
+  function updateSet(index: number, field: "t1" | "t2", value: string) {
+    setSets((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+    setError("");
+  }
+
+  // Calculate running tally
+  const tally = { team1: 0, team2: 0 };
+  const setsToWin = Math.ceil(config.totalSets / 2);
+  let matchDecided = false;
+
+  for (const set of sets) {
+    const t1 = parseInt(set.t1);
+    const t2 = parseInt(set.t2);
+    if (isNaN(t1) || isNaN(t2)) break;
+    if (t1 > t2) tally.team1++;
+    else if (t2 > t1) tally.team2++;
+    if (tally.team1 === setsToWin || tally.team2 === setsToWin) {
+      matchDecided = true;
+      break;
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const s1 = parseInt(score1);
-    const s2 = parseInt(score2);
-    if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) return;
-    onSubmit({ scoreTeam1: s1, scoreTeam2: s2 });
+    setError("");
+
+    // Collect filled sets
+    const filledSets: SetScore[] = [];
+    for (const set of sets) {
+      const t1 = parseInt(set.t1);
+      const t2 = parseInt(set.t2);
+      if (isNaN(t1) || isNaN(t2)) break;
+      if (t1 < 0 || t2 < 0) {
+        setError("Scores cannot be negative");
+        return;
+      }
+      filledSets.push({ team1: t1, team2: t2 });
+    }
+
+    if (filledSets.length === 0) {
+      setError("Enter at least one set score");
+      return;
+    }
+
+    onSubmit({ setScores: filledSets });
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Enter Score</DialogTitle>
+          <DialogTitle>Enter Set Scores</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-            <div className="space-y-2 text-center">
-              <Label className="text-sm font-medium">
-                {team1?.name ?? "TBD"}
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={score1}
-                onChange={(e) => setScore1(e.target.value)}
-                className="text-center text-2xl h-14"
-                placeholder="0"
-              />
-            </div>
-            <span className="text-lg font-bold text-muted-foreground pt-6">
-              vs
+          {/* Team headers */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-medium">
+            <span className="text-center truncate">
+              {team1?.name ?? "TBD"}
             </span>
-            <div className="space-y-2 text-center">
-              <Label className="text-sm font-medium">
-                {team2?.name ?? "TBD"}
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={score2}
-                onChange={(e) => setScore2(e.target.value)}
-                className="text-center text-2xl h-14"
-                placeholder="0"
-              />
-            </div>
+            <span className="text-muted-foreground">vs</span>
+            <span className="text-center truncate">
+              {team2?.name ?? "TBD"}
+            </span>
           </div>
+
+          {/* Set rows */}
+          <div className="space-y-2">
+            {sets.map((set, i) => {
+              // Determine if this set should be disabled (match already decided in earlier set)
+              let setsWonBefore = { team1: 0, team2: 0 };
+              for (let j = 0; j < i; j++) {
+                const t1 = parseInt(sets[j].t1);
+                const t2 = parseInt(sets[j].t2);
+                if (isNaN(t1) || isNaN(t2)) break;
+                if (t1 > t2) setsWonBefore.team1++;
+                else if (t2 > t1) setsWonBefore.team2++;
+              }
+              const setDisabled =
+                setsWonBefore.team1 === setsToWin ||
+                setsWonBefore.team2 === setsToWin;
+
+              return (
+                <div
+                  key={i}
+                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    value={set.t1}
+                    onChange={(e) => updateSet(i, "t1", e.target.value)}
+                    className="text-center h-10"
+                    placeholder="0"
+                    disabled={setDisabled}
+                  />
+                  <Label className="text-xs text-muted-foreground w-12 text-center">
+                    Set {i + 1}
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={set.t2}
+                    onChange={(e) => updateSet(i, "t2", e.target.value)}
+                    className="text-center h-10"
+                    placeholder="0"
+                    disabled={setDisabled}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Running tally */}
+          <div className="text-center text-sm">
+            <span className="font-mono font-bold">
+              {tally.team1} - {tally.team2}
+            </span>
+            <span className="text-muted-foreground ml-2">
+              (sets{matchDecided ? " -- match decided" : ""})
+            </span>
+          </div>
+
+          {/* Validation error */}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
           <div className="flex justify-between">
             <div className="flex gap-1">
               {onForfeit && team1 && team2 && (
@@ -134,10 +251,7 @@ export function ScoreEntryDialog({
               >
                 Close
               </Button>
-              <Button
-                type="submit"
-                disabled={isPending || score1 === "" || score2 === ""}
-              >
+              <Button type="submit" disabled={isPending}>
                 {isPending ? "Saving..." : "Save Score"}
               </Button>
             </div>

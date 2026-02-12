@@ -19,7 +19,6 @@ export default async function PublicEventLayout({
       <div className="mx-auto max-w-5xl px-4 py-6 space-y-4">
         <EventHeader
           name={event.name}
-          sport={event.sport}
           startDate={event.startDate}
           endDate={event.endDate}
           status={event.status}

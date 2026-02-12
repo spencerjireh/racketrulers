@@ -69,6 +69,8 @@ export function PublicScheduleView({ eventId }: PublicScheduleViewProps) {
                     team2Name={game.team2?.name ?? "TBD"}
                     scoreTeam1={game.scoreTeam1}
                     scoreTeam2={game.scoreTeam2}
+                    setScores={game.setScores as { team1: number; team2: number }[] | null}
+                    matchType={game.matchType}
                     status={game.status}
                     scheduledAt={game.scheduledAt}
                     locationName={game.location?.name ?? null}

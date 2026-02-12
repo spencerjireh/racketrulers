@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { Prisma } from "@prisma/client";
 import {
   baseProcedure,
   protectedProcedure,
@@ -8,6 +9,12 @@ import {
 import { verifyEventOwnership } from "../helpers";
 import { calculateStandings } from "@/server/lib/standings";
 import { emitToEvent } from "@/lib/socket";
+import {
+  validateMatchScores,
+  type ScoringConfig,
+  type SetScore,
+  DEFAULT_SCORING_CONFIG,
+} from "@/server/lib/scoring-validation";
 
 export const gamesRouter = createTRPCRouter({
   listByRound: protectedProcedure
@@ -109,18 +116,39 @@ export const gamesRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         eventId: z.string(),
-        scoreTeam1: z.number().int().min(0),
-        scoreTeam2: z.number().int().min(0),
+        setScores: z.array(
+          z.object({
+            team1: z.number().int().min(0),
+            team2: z.number().int().min(0),
+          })
+        ),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
 
+      // Fetch event's scoring config
+      const event = await ctx.prisma.event.findFirst({
+        where: { id: input.eventId },
+        select: { scoringConfig: true },
+      });
+      const scoringConfig = (event?.scoringConfig as unknown as ScoringConfig) ?? DEFAULT_SCORING_CONFIG;
+
+      // Validate set scores
+      const validation = validateMatchScores(input.setScores as SetScore[], scoringConfig);
+      if (!validation.valid) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: validation.error ?? "Invalid scores",
+        });
+      }
+
       const game = await ctx.prisma.game.update({
         where: { id: input.id },
         data: {
-          scoreTeam1: input.scoreTeam1,
-          scoreTeam2: input.scoreTeam2,
+          setScores: input.setScores,
+          scoreTeam1: validation.setsWon.team1,
+          scoreTeam2: validation.setsWon.team2,
           status: "COMPLETED",
         },
         include: { round: true },
@@ -129,9 +157,10 @@ export const gamesRouter = createTRPCRouter({
       // For single elim: advance winner to next bracket game
       if (game.round.type === "SINGLE_ELIM") {
         const winnerId =
-          input.scoreTeam1 > input.scoreTeam2 ? game.team1Id : game.team2Id;
+          validation.setsWon.team1 > validation.setsWon.team2
+            ? game.team1Id
+            : game.team2Id;
 
-        // Find games that reference this game as a feeder
         const nextGames = await ctx.prisma.game.findMany({
           where: {
             OR: [
@@ -161,8 +190,8 @@ export const gamesRouter = createTRPCRouter({
         gameId: game.id,
         roundId: game.roundId,
         poolId: game.poolId,
-        scoreTeam1: input.scoreTeam1,
-        scoreTeam2: input.scoreTeam2,
+        scoreTeam1: validation.setsWon.team1,
+        scoreTeam2: validation.setsWon.team2,
         status: "COMPLETED",
       }).catch(() => {});
 
@@ -223,6 +252,7 @@ export const gamesRouter = createTRPCRouter({
         scheduledAt: z.string().optional(),
         locationId: z.string().nullable().optional(),
         durationMinutes: z.number().int().min(1).optional(),
+        matchType: z.enum(["SINGLES", "DOUBLES"]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -235,6 +265,8 @@ export const gamesRouter = createTRPCRouter({
         data.locationId = input.locationId;
       if (input.durationMinutes !== undefined)
         data.durationMinutes = input.durationMinutes;
+      if (input.matchType !== undefined)
+        data.matchType = input.matchType;
 
       const updated = await ctx.prisma.game.update({
         where: { id: input.id },
@@ -260,6 +292,7 @@ export const gamesRouter = createTRPCRouter({
         data: {
           scoreTeam1: null,
           scoreTeam2: null,
+          setScores: Prisma.DbNull,
           status: "SCHEDULED",
         },
       });

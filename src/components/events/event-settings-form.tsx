@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -15,27 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-
-const SPORTS = [
-  "Basketball",
-  "Soccer",
-  "Volleyball",
-  "Tennis",
-  "Badminton",
-  "Table Tennis",
-  "Baseball",
-  "Softball",
-  "Football",
-  "Rugby",
-  "Cricket",
-  "Hockey",
-  "Futsal",
-  "Handball",
-  "Swimming",
-  "Track & Field",
-  "Esports",
-  "Other",
-];
 
 const TIMEZONES = [
   "America/New_York",
@@ -65,16 +45,30 @@ const TIMEZONES = [
   "Pacific/Auckland",
 ];
 
+interface ScoringConfig {
+  pointsPerSet: number;
+  totalSets: number;
+  deuceEnabled: boolean;
+  maxPoints: number;
+}
+
+const DEFAULT_SCORING_CONFIG: ScoringConfig = {
+  pointsPerSet: 21,
+  totalSets: 3,
+  deuceEnabled: true,
+  maxPoints: 30,
+};
+
 interface EventSettingsFormProps {
   event: {
     id: string;
     name: string;
-    sport: string;
     description: string | null;
     startDate: Date;
     endDate: Date;
     timezone: string;
     status: "PUBLISHED" | "COMPLETED";
+    scoringConfig?: ScoringConfig;
   };
 }
 
@@ -88,13 +82,13 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
   const queryClient = useQueryClient();
   const isCompleted = event.status === "COMPLETED";
 
-  const [sport, setSport] = useState(
-    SPORTS.includes(event.sport) ? event.sport : "Other"
-  );
-  const [customSport, setCustomSport] = useState(
-    SPORTS.includes(event.sport) ? "" : event.sport
-  );
   const [timezone, setTimezone] = useState(event.timezone);
+
+  const parsedConfig = (event.scoringConfig ?? DEFAULT_SCORING_CONFIG) as ScoringConfig;
+  const [pointsPerSet, setPointsPerSet] = useState(parsedConfig.pointsPerSet);
+  const [totalSets, setTotalSets] = useState(String(parsedConfig.totalSets));
+  const [deuceEnabled, setDeuceEnabled] = useState(parsedConfig.deuceEnabled);
+  const [maxPoints, setMaxPoints] = useState(parsedConfig.maxPoints);
 
   const updateEvent = useMutation(
     trpc.events.update.mutationOptions({
@@ -111,21 +105,25 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const resolvedSport = sport === "Other" ? customSport : sport;
 
     updateEvent.mutate({
       id: event.id,
       name: (formData.get("name") as string).trim(),
-      sport: resolvedSport.trim(),
       description: (formData.get("description") as string) || undefined,
       startDate: formData.get("startDate") as string,
       endDate: formData.get("endDate") as string,
       timezone,
+      scoringConfig: {
+        pointsPerSet,
+        totalSets: parseInt(totalSets),
+        deuceEnabled,
+        maxPoints,
+      },
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
       <div className="space-y-2">
         <Label htmlFor="name">Event Name</Label>
         <Input
@@ -134,30 +132,6 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
           defaultValue={event.name}
           disabled={isCompleted}
         />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Sport</Label>
-        <Select value={sport} onValueChange={setSport} disabled={isCompleted}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SPORTS.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {sport === "Other" && (
-          <Input
-            placeholder="Enter sport name"
-            value={customSport}
-            onChange={(e) => setCustomSport(e.target.value)}
-            disabled={isCompleted}
-          />
-        )}
       </div>
 
       <div className="space-y-2">
@@ -208,6 +182,69 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Scoring Rules */}
+      <div className="space-y-4 rounded-lg border p-4">
+        <h3 className="text-sm font-semibold">Scoring Rules</h3>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="pointsPerSet">Points per Set</Label>
+            <Input
+              id="pointsPerSet"
+              type="number"
+              min={1}
+              max={50}
+              value={pointsPerSet}
+              onChange={(e) => setPointsPerSet(parseInt(e.target.value) || 21)}
+              disabled={isCompleted}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Sets to Play (Best of)</Label>
+            <Select
+              value={totalSets}
+              onValueChange={setTotalSets}
+              disabled={isCompleted}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 set</SelectItem>
+                <SelectItem value="3">Best of 3</SelectItem>
+                <SelectItem value="5">Best of 5</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="maxPoints">Max Points (Deuce Cap)</Label>
+            <Input
+              id="maxPoints"
+              type="number"
+              min={1}
+              max={50}
+              value={maxPoints}
+              onChange={(e) => setMaxPoints(parseInt(e.target.value) || 30)}
+              disabled={isCompleted}
+            />
+          </div>
+          <div className="flex items-center gap-2 pt-6">
+            <Checkbox
+              id="deuceEnabled"
+              checked={deuceEnabled}
+              onCheckedChange={(checked) => setDeuceEnabled(checked === true)}
+              disabled={isCompleted}
+            />
+            <Label htmlFor="deuceEnabled" className="text-sm font-normal">
+              Enable deuce (2-point lead required)
+            </Label>
+          </div>
+        </div>
       </div>
 
       <Button type="submit" disabled={isCompleted || updateEvent.isPending}>

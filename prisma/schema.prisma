@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── Auth Models (Auth.js) ───────────────────────────────────────────────────
@@ -85,7 +86,6 @@ model Event {
   id          String      @id @default(cuid())
   name        String
   slug        String      @unique
-  sport       String
   description String?
   bannerUrl   String?     @map("banner_url")
   status      EventStatus @default(PUBLISHED)
@@ -93,7 +93,8 @@ model Event {
   startDate   DateTime    @map("start_date")
   endDate     DateTime    @map("end_date")
 
-  pointsConfig Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
+  pointsConfig  Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
+  scoringConfig Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
 
   ownerId String @map("owner_id")
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -204,15 +205,24 @@ enum GameStatus {
   @@map("game_status")
 }
 
+enum MatchType {
+  SINGLES
+  DOUBLES
+
+  @@map("match_type")
+}
+
 model Game {
   id             String     @id @default(cuid())
   status         GameStatus @default(SCHEDULED)
+  matchType      MatchType  @default(SINGLES) @map("match_type")
   roundPosition  Int?       @map("round_position")
   scheduledAt    DateTime?  @map("scheduled_at")
   durationMinutes Int       @default(60) @map("duration_minutes")
 
   scoreTeam1 Int? @map("score_team1")
   scoreTeam2 Int? @map("score_team2")
+  setScores  Json? @map("set_scores")
 
   team1Id String? @map("team1_id")
   team1   Team?   @relation("GameTeam1", fields: [team1Id], references: [id])

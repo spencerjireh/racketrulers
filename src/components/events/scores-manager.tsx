@@ -7,10 +7,28 @@ import { GamesList } from "./games-list";
 import { StandingsTable } from "./standings-table";
 import { useRealtimeEvent } from "@/hooks/use-realtime-event";
 
+interface ScoringConfig {
+  pointsPerSet: number;
+  totalSets: number;
+  deuceEnabled: boolean;
+  maxPoints: number;
+}
+
 export function ScoresManager({ eventId }: { eventId: string }) {
   const trpc = useTRPC();
 
   useRealtimeEvent(eventId);
+
+  const { data: event } = useQuery(
+    trpc.events.getById.queryOptions({ id: eventId })
+  );
+
+  const scoringConfig = (event?.scoringConfig as ScoringConfig | undefined) ?? {
+    pointsPerSet: 21,
+    totalSets: 3,
+    deuceEnabled: true,
+    maxPoints: 30,
+  };
 
   const { data: allGames, isLoading } = useQuery(
     trpc.games.listByEvent.queryOptions({ eventId })
@@ -97,6 +115,7 @@ export function ScoresManager({ eventId }: { eventId: string }) {
                             <GamesList
                               games={poolGroup.games!}
                               eventId={eventId}
+                              scoringConfig={scoringConfig}
                             />
                             {roundGroup.roundType === "ROUND_ROBIN" && (
                               <StandingsTable
@@ -113,6 +132,7 @@ export function ScoresManager({ eventId }: { eventId: string }) {
                       <GamesList
                         games={roundGroup.unpooledGames!}
                         eventId={eventId}
+                        scoringConfig={scoringConfig}
                       />
                     )}
 

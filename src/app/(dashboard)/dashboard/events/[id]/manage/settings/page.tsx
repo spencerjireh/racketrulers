@@ -60,7 +60,10 @@ export default function SettingsPage({
           <CardTitle>Event Settings</CardTitle>
         </CardHeader>
         <CardContent>
-          <EventSettingsForm event={event} />
+          <EventSettingsForm event={{
+            ...event,
+            scoringConfig: event.scoringConfig as { pointsPerSet: number; totalSets: number; deuceEnabled: boolean; maxPoints: number } | undefined,
+          }} />
         </CardContent>
       </Card>
 

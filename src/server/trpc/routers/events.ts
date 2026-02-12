@@ -41,7 +41,6 @@ export const eventsRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1, "Name is required"),
-        sport: z.string().min(1, "Sport is required"),
         startDate: z.string(),
         endDate: z.string(),
         timezone: z.string().default("America/Toronto"),
@@ -63,7 +62,6 @@ export const eventsRouter = createTRPCRouter({
         data: {
           name: input.name,
           slug,
-          sport: input.sport,
           startDate: start,
           endDate: end,
           timezone: input.timezone,
@@ -126,7 +124,6 @@ export const eventsRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         name: z.string().min(1).optional(),
-        sport: z.string().min(1).optional(),
         description: z.string().optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
@@ -136,6 +133,16 @@ export const eventsRouter = createTRPCRouter({
             win: z.number(),
             draw: z.number(),
             loss: z.number(),
+          })
+          .optional(),
+        scoringConfig: z
+          .object({
+            pointsPerSet: z.number().int().min(1).max(50),
+            totalSets: z.number().int().refine((v) => v >= 1 && v <= 9 && v % 2 === 1, {
+              message: "Total sets must be an odd number between 1 and 9",
+            }),
+            deuceEnabled: z.boolean(),
+            maxPoints: z.number().int().min(1).max(50),
           })
           .optional(),
       })
@@ -158,12 +165,13 @@ export const eventsRouter = createTRPCRouter({
       const updateData: Record<string, unknown> = {};
 
       if (data.name !== undefined) updateData.name = data.name;
-      if (data.sport !== undefined) updateData.sport = data.sport;
       if (data.description !== undefined)
         updateData.description = data.description;
       if (data.timezone !== undefined) updateData.timezone = data.timezone;
       if (data.pointsConfig !== undefined)
         updateData.pointsConfig = data.pointsConfig;
+      if (data.scoringConfig !== undefined)
+        updateData.scoringConfig = data.scoringConfig;
       if (data.startDate !== undefined)
         updateData.startDate = new Date(data.startDate);
       if (data.endDate !== undefined)
@@ -203,5 +211,71 @@ export const eventsRouter = createTRPCRouter({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       });
+    }),
+
+  listPublic: baseProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        status: z
+          .enum(["all", "upcoming", "in-progress", "completed"])
+          .optional()
+          .default("all"),
+        page: z.number().int().min(1).optional().default(1),
+        pageSize: z.number().int().min(1).max(50).optional().default(12),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const where: Record<string, unknown> = { deletedAt: null };
+
+      if (input.search) {
+        where.name = { contains: input.search, mode: "insensitive" };
+      }
+
+      if (input.status === "upcoming") {
+        where.status = "PUBLISHED";
+        where.startDate = { gt: now };
+      } else if (input.status === "in-progress") {
+        where.status = "PUBLISHED";
+        where.startDate = { lte: now };
+        where.endDate = { gte: now };
+      } else if (input.status === "completed") {
+        where.status = "COMPLETED";
+      }
+
+      const [events, totalCount] = await Promise.all([
+        ctx.prisma.event.findMany({
+          where,
+          orderBy: { startDate: "desc" },
+          skip: (input.page - 1) * input.pageSize,
+          take: input.pageSize,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            bannerUrl: true,
+            status: true,
+            startDate: true,
+            endDate: true,
+            _count: {
+              select: {
+                categories: true,
+                teams: true,
+                locations: true,
+              },
+            },
+          },
+        }),
+        ctx.prisma.event.count({ where }),
+      ]);
+
+      return {
+        events,
+        totalCount,
+        totalPages: Math.ceil(totalCount / input.pageSize),
+        currentPage: input.page,
+      };
     }),
 });
