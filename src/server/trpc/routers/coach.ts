@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, createTRPCRouter } from "../init";
+import { baseProcedure, protectedProcedure, createTRPCRouter } from "../init";
 
 export const coachRouter = createTRPCRouter({
   getProfile: protectedProcedure.query(async ({ ctx }) => {
@@ -180,5 +180,50 @@ export const coachRouter = createTRPCRouter({
         where: { id: input.bookingId },
         data: { status: "CANCELLED" },
       });
+    }),
+
+  listPublic: baseProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        page: z.number().int().min(1).optional().default(1),
+        pageSize: z.number().int().min(1).max(50).optional().default(12),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const where: Record<string, unknown> = {
+        availability: { some: {} },
+      };
+
+      if (input.search) {
+        where.displayName = { contains: input.search, mode: "insensitive" };
+      }
+
+      const [coaches, totalCount] = await Promise.all([
+        ctx.prisma.coachProfile.findMany({
+          where,
+          orderBy: { displayName: "asc" },
+          skip: (input.page - 1) * input.pageSize,
+          take: input.pageSize,
+          select: {
+            id: true,
+            displayName: true,
+            slug: true,
+            sessionDurationMinutes: true,
+            timezone: true,
+            _count: {
+              select: { availability: true },
+            },
+          },
+        }),
+        ctx.prisma.coachProfile.count({ where }),
+      ]);
+
+      return {
+        coaches,
+        totalCount,
+        totalPages: Math.ceil(totalCount / input.pageSize),
+        currentPage: input.page,
+      };
     }),
 });
