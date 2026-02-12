@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTRPC } from "@/lib/trpc/client";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,10 @@ export function RoundsManager({ categoryId, eventId }: RoundsManagerProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [expandedRound, setExpandedRound] = useState<string | null>(null);
+  const [expandedRound, setExpandedRound] = usePersistedState<string | null>(
+    `collapsible:rounds:${categoryId}`,
+    null
+  );
 
   const { data: rounds } = useQuery(
     trpc.rounds.list.queryOptions({ categoryId, eventId })
