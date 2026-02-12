@@ -4,10 +4,10 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
-import { ScheduleCalendar } from "@/components/events/schedule-calendar";
+import { FormatStep } from "@/components/events/format-step";
 import { Button } from "@/components/ui/button";
 
-export default function SchedulePage({
+export default function FormatPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -21,24 +21,24 @@ export default function SchedulePage({
 
   return (
     <div className="space-y-6">
-      <ScheduleCalendar eventId={id} />
+      <FormatStep eventId={id} />
 
       {isDraft && (
         <div className="flex justify-between">
           <Button
             variant="outline"
             onClick={() =>
-              router.push(`/dashboard/events/${id}/manage/rounds`)
+              router.push(`/dashboard/events/${id}/manage/details`)
             }
           >
-            Back: Rounds
+            Back: Details
           </Button>
           <Button
             onClick={() =>
-              router.push(`/dashboard/events/${id}/manage/review`)
+              router.push(`/dashboard/events/${id}/manage/teams`)
             }
           >
-            Next: Review
+            Next: Teams
           </Button>
         </div>
       )}

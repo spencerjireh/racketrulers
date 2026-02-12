@@ -6,5 +6,5 @@ export default async function ManageEventPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/dashboard/events/${id}/manage/settings`);
+  redirect(`/dashboard/events/${id}/manage/details`);
 }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerCaller } from "@/lib/trpc/server";
 import { Badge } from "@/components/ui/badge";
-import { ManageNav } from "@/components/events/manage-nav";
+import { EventStepper } from "@/components/events/event-stepper";
 
 export default async function ManageEventLayout({
   children,
@@ -20,15 +20,29 @@ export default async function ManageEventLayout({
     redirect("/dashboard/events");
   }
 
+  const statusLabel =
+    event.status === "DRAFT"
+      ? "Draft"
+      : event.status === "PUBLISHED"
+        ? "Active"
+        : "Completed";
+
+  const statusVariant =
+    event.status === "DRAFT"
+      ? "outline"
+      : event.status === "PUBLISHED"
+        ? "default"
+        : "secondary";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">{event.name}</h1>
-        <Badge variant={event.status === "PUBLISHED" ? "default" : "secondary"}>
-          {event.status === "PUBLISHED" ? "Active" : "Completed"}
+        <Badge variant={statusVariant as "default" | "secondary" | "outline"}>
+          {statusLabel}
         </Badge>
       </div>
-      <ManageNav eventId={id} />
+      <EventStepper eventId={id} status={event.status} />
       {children}
     </div>
   );

@@ -4,10 +4,10 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
-import { ScheduleCalendar } from "@/components/events/schedule-calendar";
+import { RoundsStep } from "@/components/events/rounds-step";
 import { Button } from "@/components/ui/button";
 
-export default function SchedulePage({
+export default function RoundsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -21,24 +21,24 @@ export default function SchedulePage({
 
   return (
     <div className="space-y-6">
-      <ScheduleCalendar eventId={id} />
+      <RoundsStep eventId={id} />
 
       {isDraft && (
         <div className="flex justify-between">
           <Button
             variant="outline"
             onClick={() =>
-              router.push(`/dashboard/events/${id}/manage/rounds`)
+              router.push(`/dashboard/events/${id}/manage/teams`)
             }
           >
-            Back: Rounds
+            Back: Teams
           </Button>
           <Button
             onClick={() =>
-              router.push(`/dashboard/events/${id}/manage/review`)
+              router.push(`/dashboard/events/${id}/manage/schedule`)
             }
           >
-            Next: Review
+            Next: Schedule
           </Button>
         </div>
       )}
