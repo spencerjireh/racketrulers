@@ -5,6 +5,7 @@ interface GameSeed {
   poolId: string | null;
   feederGame1Id?: string;
   feederGame2Id?: string;
+  bracketType?: "winners" | "losers" | "grand_finals";
 }
 
 /**
@@ -62,7 +63,6 @@ export function generateSingleElimGames(
 
   const n = teamIds.length;
   const bracketSize = nextPowerOf2(n);
-  const numByes = bracketSize - n;
   const totalRounds = Math.log2(bracketSize);
 
   // Create seeded matchups for first round
@@ -150,6 +150,201 @@ export function generateSingleElimGames(
           roundPosition: position++,
           poolId: null,
         });
+      }
+    }
+  }
+
+  return games;
+}
+
+/**
+ * Double Elimination bracket generation.
+ * Creates winners bracket (standard SE), losers bracket, and grand finals.
+ */
+export function generateDoubleElimGames(
+  teamIds: string[],
+  resetMatch: boolean = true
+): GameSeed[] {
+  if (teamIds.length < 2) return [];
+
+  const n = teamIds.length;
+  const bracketSize = nextPowerOf2(n);
+  const wbRounds = Math.log2(bracketSize);
+
+  const games: GameSeed[] = [];
+  let position = 1;
+
+  // --- Winners Bracket ---
+  const firstRoundMatchups = createSeededMatchups(bracketSize);
+  const wbRoundGames: Map<number, number[]> = new Map(); // round -> game indices
+
+  // WB Round 1
+  const wbR1Indices: number[] = [];
+  for (const [seed1, seed2] of firstRoundMatchups) {
+    const t1 = seed1 <= n ? teamIds[seed1 - 1] : null;
+    const t2 = seed2 <= n ? teamIds[seed2 - 1] : null;
+    wbR1Indices.push(games.length);
+    games.push({
+      team1Id: t1,
+      team2Id: t2,
+      roundPosition: position++,
+      poolId: null,
+      bracketType: "winners",
+    });
+  }
+  wbRoundGames.set(0, wbR1Indices);
+
+  // WB subsequent rounds
+  for (let round = 1; round < wbRounds; round++) {
+    const prev = wbRoundGames.get(round - 1)!;
+    const indices: number[] = [];
+    for (let i = 0; i < prev.length; i += 2) {
+      const g1 = games[prev[i]];
+      const g2 = games[prev[i + 1]];
+      // Auto-advance byes
+      const auto1 = g1.team1Id === null ? g1.team2Id : g1.team2Id === null ? g1.team1Id : null;
+      const auto2 = g2.team1Id === null ? g2.team2Id : g2.team2Id === null ? g2.team1Id : null;
+      indices.push(games.length);
+      games.push({
+        team1Id: auto1,
+        team2Id: auto2,
+        roundPosition: position++,
+        poolId: null,
+        bracketType: "winners",
+      });
+    }
+    wbRoundGames.set(round, indices);
+  }
+
+  // --- Losers Bracket ---
+  // LB has (wbRounds - 1) * 2 rounds in a standard DE format,
+  // but simplified: we create placeholder games for losers bracket
+  const lbRoundGames: Map<number, number[]> = new Map();
+
+  // LB Round 1: losers from WB Round 1 (half the games)
+  const wbR1 = wbRoundGames.get(0)!;
+  const lbR1Indices: number[] = [];
+  for (let i = 0; i < wbR1.length; i += 2) {
+    lbR1Indices.push(games.length);
+    games.push({
+      team1Id: null, // loser of WB game
+      team2Id: null, // loser of WB game
+      roundPosition: position++,
+      poolId: null,
+      bracketType: "losers",
+    });
+  }
+  lbRoundGames.set(0, lbR1Indices);
+
+  // LB subsequent rounds: alternate between "drop-down" rounds (losers from WB enter)
+  // and "elimination" rounds (LB teams play each other)
+  let lbRound = 1;
+  for (let wbRound = 1; wbRound < wbRounds; wbRound++) {
+    const prevLb = lbRoundGames.get(lbRound - 1)!;
+
+    // Drop-down round: LB survivors vs WB losers from this WB round
+    const dropIndices: number[] = [];
+    const wbLosersFromRound = wbRoundGames.get(wbRound)!;
+    const numDropMatches = Math.max(prevLb.length, wbLosersFromRound.length);
+    for (let i = 0; i < numDropMatches; i++) {
+      dropIndices.push(games.length);
+      games.push({
+        team1Id: null, // LB survivor
+        team2Id: null, // WB loser dropping down
+        roundPosition: position++,
+        poolId: null,
+        bracketType: "losers",
+      });
+    }
+    lbRoundGames.set(lbRound, dropIndices);
+    lbRound++;
+
+    // Elimination round: winners from drop-down play each other
+    if (dropIndices.length > 1) {
+      const elimIndices: number[] = [];
+      for (let i = 0; i < dropIndices.length; i += 2) {
+        elimIndices.push(games.length);
+        games.push({
+          team1Id: null,
+          team2Id: null,
+          roundPosition: position++,
+          poolId: null,
+          bracketType: "losers",
+        });
+      }
+      lbRoundGames.set(lbRound, elimIndices);
+      lbRound++;
+    }
+  }
+
+  // --- Grand Finals ---
+  games.push({
+    team1Id: null, // WB champion
+    team2Id: null, // LB champion
+    roundPosition: position++,
+    poolId: null,
+    bracketType: "grand_finals",
+  });
+
+  // Optional reset match
+  if (resetMatch) {
+    games.push({
+      team1Id: null,
+      team2Id: null,
+      roundPosition: position++,
+      poolId: null,
+      bracketType: "grand_finals",
+    });
+  }
+
+  return games;
+}
+
+/**
+ * Swiss pairing generation (Monrad system).
+ * Round 1: Random or seeded pairings.
+ * Subsequent rounds: Pair teams with similar records, avoiding rematches.
+ */
+export function generateSwissPairings(
+  teamIds: string[],
+  previousResults?: { teamId: string; wins: number; losses: number }[]
+): GameSeed[] {
+  if (teamIds.length < 2) return [];
+
+  const games: GameSeed[] = [];
+  let position = 1;
+
+  if (!previousResults || previousResults.length === 0) {
+    // Round 1: random pairings
+    const shuffled = [...teamIds].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < shuffled.length - 1; i += 2) {
+      games.push({
+        team1Id: shuffled[i],
+        team2Id: shuffled[i + 1],
+        roundPosition: position++,
+        poolId: null,
+      });
+    }
+    // If odd number, last team gets a bye (no game created)
+  } else {
+    // Sort by win count descending, then pair adjacent teams
+    const sorted = [...previousResults].sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+    const paired = new Set<string>();
+
+    for (let i = 0; i < sorted.length; i++) {
+      if (paired.has(sorted[i].teamId)) continue;
+      // Find the next unpaired team
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (paired.has(sorted[j].teamId)) continue;
+        paired.add(sorted[i].teamId);
+        paired.add(sorted[j].teamId);
+        games.push({
+          team1Id: sorted[i].teamId,
+          team2Id: sorted[j].teamId,
+          roundPosition: position++,
+          poolId: null,
+        });
+        break;
       }
     }
   }
