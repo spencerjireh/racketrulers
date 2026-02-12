@@ -46,7 +46,7 @@ const TIMEZONES = [
 export function CreateEventForm() {
   const router = useRouter();
   const trpc = useTRPC();
-  const [timezone, setTimezone] = useState("America/Toronto");
+  const [timezone, setTimezone] = useState("Asia/Manila");
   const [error, setError] = useState("");
 
   const createEvent = useMutation(trpc.events.create.mutationOptions());

@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 
 const TIMEZONES = [
+  "Asia/Manila",
   "America/Toronto",
   "America/New_York",
   "America/Chicago",
@@ -35,7 +36,7 @@ export function ProfileSetup() {
   const [displayName, setDisplayName] = useState("");
   const [slug, setSlug] = useState("");
   const [duration, setDuration] = useState(60);
-  const [timezone, setTimezone] = useState("America/Toronto");
+  const [timezone, setTimezone] = useState("Asia/Manila");
 
   const createProfile = useMutation(
     trpc.coach.createProfile.mutationOptions({

@@ -43,7 +43,7 @@ export const eventsRouter = createTRPCRouter({
         name: z.string().min(1, "Name is required"),
         startDate: z.string(),
         endDate: z.string(),
-        timezone: z.string().default("America/Toronto"),
+        timezone: z.string().default("Asia/Manila"),
       })
     )
     .mutation(async ({ ctx, input }) => {

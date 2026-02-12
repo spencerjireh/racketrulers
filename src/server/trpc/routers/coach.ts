@@ -62,7 +62,7 @@ export const coachRouter = createTRPCRouter({
           displayName: input.displayName,
           slug: input.slug,
           sessionDurationMinutes: input.sessionDurationMinutes ?? 60,
-          timezone: input.timezone ?? "America/Toronto",
+          timezone: input.timezone ?? "Asia/Manila",
           userId: ctx.userId,
         },
       });
