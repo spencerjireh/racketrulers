@@ -7,12 +7,29 @@ export const authRouter = createTRPCRouter({
   signup: baseProcedure
     .input(
       z.object({
+        inviteCode: z.string().min(1, "Invite code is required"),
         name: z.string().min(1, "Name is required"),
         email: z.string().email("Invalid email"),
         password: z.string().min(8, "Password must be at least 8 characters"),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const rawCodes = process.env.INVITE_CODES;
+      if (!rawCodes) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Signup is currently disabled",
+        });
+      }
+
+      const validCodes = rawCodes.split(",").map((c) => c.trim().toUpperCase());
+      if (!validCodes.includes(input.inviteCode.trim().toUpperCase())) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Invalid invite code",
+        });
+      }
+
       const existing = await ctx.prisma.user.findUnique({
         where: { email: input.email },
       });

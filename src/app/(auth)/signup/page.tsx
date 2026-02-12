@@ -21,6 +21,7 @@ export default function SignupPage() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
+    const inviteCode = formData.get("inviteCode") as string;
     const name = formData.get("name") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
@@ -32,7 +33,7 @@ export default function SignupPage() {
     }
 
     try {
-      await signup.mutateAsync({ name, email, password });
+      await signup.mutateAsync({ inviteCode, name, email, password });
       router.push("/login");
     } catch (err: unknown) {
       const message =
@@ -43,9 +44,9 @@ export default function SignupPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Create an account</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Create an organizer / coach account</h1>
       <p className="mt-1.5 text-muted-foreground">
-        Enter your details to get started with TourneyHub
+        You need an invite code to sign up. Players and spectators don&apos;t need an account.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -54,6 +55,15 @@ export default function SignupPage() {
             {error}
           </div>
         )}
+        <div className="space-y-2">
+          <Label htmlFor="inviteCode">Invite code</Label>
+          <Input
+            id="inviteCode"
+            name="inviteCode"
+            placeholder="e.g. RACK-2025-ALPHA"
+            required
+          />
+        </div>
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" name="name" placeholder="Your name" required />
