@@ -1,0 +1,4 @@
+# GoingEnv directory gitignore
+# Ignore temporary files
+*.tmp
+*.temp
