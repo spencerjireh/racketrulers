@@ -52,8 +52,8 @@ const navItems = [
     icon: Calendar,
   },
   {
-    title: "My Events",
-    href: "/dashboard/events",
+    title: "My Tournaments",
+    href: "/dashboard/tournaments",
     icon: Trophy,
   },
 ];

@@ -23,21 +23,21 @@ function getPusher() {
   return pusherInstance;
 }
 
-export function useSocket(eventId?: string) {
+export function useSocket(tournamentId?: string) {
   const channelRef = useRef<Channel | null>(null);
 
   useEffect(() => {
-    if (!eventId) return;
+    if (!tournamentId) return;
 
     const pusher = getPusher();
-    const channel = pusher.subscribe(`event.${eventId}`);
+    const channel = pusher.subscribe(`tournament.${tournamentId}`);
     channelRef.current = channel;
 
     return () => {
-      pusher.unsubscribe(`event.${eventId}`);
+      pusher.unsubscribe(`tournament.${tournamentId}`);
       channelRef.current = null;
     };
-  }, [eventId]);
+  }, [tournamentId]);
 
   const on = useCallback(
     (event: string, callback: (...args: unknown[]) => void) => {

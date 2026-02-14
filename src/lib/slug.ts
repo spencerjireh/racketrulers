@@ -16,13 +16,13 @@ export async function generateUniqueSlug(
     throw new Error("Name must contain at least one alphanumeric character");
   }
 
-  const existing = await prisma.event.findUnique({ where: { slug: base } });
+  const existing = await prisma.tournament.findUnique({ where: { slug: base } });
   if (!existing) return base;
 
   let suffix = 2;
   while (true) {
     const candidate = `${base}-${suffix}`;
-    const found = await prisma.event.findUnique({
+    const found = await prisma.tournament.findUnique({
       where: { slug: candidate },
     });
     if (!found) return candidate;

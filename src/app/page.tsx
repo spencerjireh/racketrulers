@@ -89,14 +89,14 @@ export default function HomePage() {
               className="glow-primary h-12 px-8 text-base"
               asChild
             >
-              <Link href="/events?tab=coaches">Book a Coach</Link>
+              <Link href="/tournaments?tab=coaches">Book a Coach</Link>
             </Button>
             <Button
               size="lg"
               className="glow-primary h-12 px-8 text-base"
               asChild
             >
-              <Link href="/events">See Event</Link>
+              <Link href="/tournaments">Browse Tournaments</Link>
             </Button>
             <Button
               size="lg"
@@ -172,14 +172,14 @@ export default function HomePage() {
                 className="glow-primary h-12 px-8 text-base"
                 asChild
               >
-                <Link href="/events?tab=coaches">Book a Coach</Link>
+                <Link href="/tournaments?tab=coaches">Book a Coach</Link>
               </Button>
               <Button
                 size="lg"
                 className="glow-primary h-12 px-8 text-base"
                 asChild
               >
-                <Link href="/events">See Event</Link>
+                <Link href="/tournaments">Browse Tournaments</Link>
               </Button>
               <Button
                 size="lg"

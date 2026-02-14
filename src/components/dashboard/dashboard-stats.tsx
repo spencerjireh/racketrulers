@@ -7,31 +7,31 @@ import { Trophy, Calendar, Users } from "lucide-react";
 
 export function DashboardStats() {
   const trpc = useTRPC();
-  const { data } = useQuery(trpc.events.getStats.queryOptions());
+  const { data } = useQuery(trpc.tournaments.getStats.queryOptions());
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+          <CardTitle className="text-sm font-medium">Total Tournaments</CardTitle>
           <Trophy className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{data?.totalEvents ?? 0}</div>
+          <div className="text-2xl font-bold">{data?.totalTournaments ?? 0}</div>
           <p className="text-xs text-muted-foreground">
-            {data?.totalEvents ? `${data.totalEvents} event(s)` : "Create your first event"}
+            {data?.totalTournaments ? `${data.totalTournaments} tournament(s)` : "Create your first tournament"}
           </p>
         </CardContent>
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Active Events</CardTitle>
+          <CardTitle className="text-sm font-medium">Active Tournaments</CardTitle>
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{data?.activeEvents ?? 0}</div>
+          <div className="text-2xl font-bold">{data?.activeTournaments ?? 0}</div>
           <p className="text-xs text-muted-foreground">
-            {data?.activeEvents ? `${data.activeEvents} active` : "No active events"}
+            {data?.activeTournaments ? `${data.activeTournaments} active` : "No active tournaments"}
           </p>
         </CardContent>
       </Card>

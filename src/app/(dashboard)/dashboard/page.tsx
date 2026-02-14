@@ -27,7 +27,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <Button asChild>
-              <Link href="/dashboard/events">Manage Events</Link>
+              <Link href="/dashboard/tournaments">My Tournaments</Link>
             </Button>
             <Button variant="outline" asChild>
               <Link href="/dashboard/coach">Coach Scheduler</Link>

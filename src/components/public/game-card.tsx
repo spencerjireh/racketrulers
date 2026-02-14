@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { GameStatusBadge } from "@/components/events/game-status-badge";
+import { GameStatusBadge } from "@/components/tournaments/game-status-badge";
 
 interface SetScore {
   team1: number;

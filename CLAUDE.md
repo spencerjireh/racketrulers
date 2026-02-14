@@ -32,7 +32,7 @@ Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4 (inlin
 ### tRPC wiring
 
 - **Server init**: `src/server/trpc/init.ts` -- creates context with `prisma`, `session`, `userId`. Exports `baseProcedure` (public) and `protectedProcedure` (auth-required).
-- **Routers**: `src/server/trpc/routers/_app.ts` -- merges: auth, events, locations, teams, categories, rounds, pools, games, coach, bookings.
+- **Routers**: `src/server/trpc/routers/_app.ts` -- merges: auth, tournaments, locations, teams, rounds, pools, games, coach, bookings.
 - **Client (React)**: `src/lib/trpc/client.tsx` -- uses `createTRPCContext` from `@trpc/tanstack-react-query`. The `TRPCProvider` prop is `trpcClient` (NOT `client`). Use `useTRPC()` hook to get the tRPC proxy in client components.
 - **Server caller**: `src/lib/trpc/server.ts` -- `createServerCaller()` for calling tRPC from Server Components / Server Actions.
 
@@ -52,34 +52,35 @@ Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4 (inlin
 
 ### Realtime (Soketi / Pusher protocol)
 
-- Server: `src/lib/socket.ts` -- `emitToEvent(eventId, eventName, payload)` using `pusher` server SDK.
-- Client: `src/hooks/use-socket.ts` -- singleton `pusher-js` instance, `useSocket(eventId)` hook.
-- Auto-invalidation: `src/hooks/use-realtime-event.ts` -- invalidates TanStack Query caches on WS events.
-- Channel pattern: `event.{eventId}`. Event names: `score:updated`, `schedule:updated`, `event:updated`.
+- Server: `src/lib/socket.ts` -- `emitToTournament(tournamentId, eventName, payload)` using `pusher` server SDK.
+- Client: `src/hooks/use-socket.ts` -- singleton `pusher-js` instance, `useSocket(tournamentId)` hook.
+- Auto-invalidation: `src/hooks/use-realtime-event.ts` -- `useRealtimeTournament()` invalidates TanStack Query caches on WS events.
+- Channel pattern: `tournament.{tournamentId}`. Event names: `score:updated`, `schedule:updated`, `tournament:updated`.
 
 ### Tournament data model
 
-Event -> Category -> Round -> Pool -> Game. Teams are assigned to categories via CategoryTeam and to pools via PoolTeam. Games have feeder game relations for bracket advancement. Scores use set-based scoring (`setScores` JSON array + `scoreTeam1`/`scoreTeam2` integers).
+Tournament -> Round -> Pool -> Game. Teams belong directly to a Tournament (with a `seed` field) and are assigned to pools via PoolTeam. Games have feeder game relations for bracket advancement. Scores use set-based scoring (`setScores` JSON array + `scoreTeam1`/`scoreTeam2` integers). Tournament has `format` (RoundType), `drawsAllowed`, `scoringConfig`, `tiebreakerConfig`, and `pointsConfig` fields.
 
 ### Server business logic
 
 - `src/server/lib/game-generation.ts` -- generates matchups for round robin, single elim, double elim, swiss.
 - `src/server/lib/standings.ts` -- calculates standings with configurable tiebreakers.
-- `src/server/lib/scoring-validation.ts` -- validates set scores against event scoring config.
-- `src/server/trpc/helpers.ts` -- `verifyEventOwnership()` authorization helper.
+- `src/server/lib/scoring-validation.ts` -- validates set scores against tournament scoring config.
+- `src/server/trpc/helpers.ts` -- `verifyTournamentOwnership()` authorization helper.
 
 ### Route structure
 
-- Public: `/` (landing), `/events` (explore), `/events/[slug]` (event page), `/book/[slug]` (coach booking)
+- Public: `/` (landing), `/tournaments` (explore), `/tournaments/[slug]` (tournament page), `/tournaments/[slug]/bracket`, `/tournaments/[slug]/standings`, `/book/[slug]` (coach booking)
 - Auth: `/(auth)/login`, `/(auth)/signup`
-- Dashboard: `/(dashboard)/dashboard/events/[id]/manage/{teams,categories,schedule,scores,locations,settings}`
+- Dashboard: `/(dashboard)/dashboard/tournaments/[id]/manage/{settings,participants,bracket}`, `/(dashboard)/dashboard/tournaments/new`
 - Coach: `/(dashboard)/dashboard/coach`
 - API: `/api/auth/[...nextauth]`, `/api/trpc/[trpc]`
+- Redirects: `/events/*` -> `/tournaments/*`, `/dashboard/events/*` -> `/dashboard/tournaments/*`
 
 ## Key conventions
 
 - Use `sonner` for toast notifications (shadcn/ui `toast` is deprecated).
 - Prisma v6 only -- v7 had P1010 auth errors with Neon.
 - Soketi config requires `cluster: ""` in pusher-js (not a real Pusher cluster).
-- Event soft-deletes use `deletedAt` field -- always filter with `deletedAt: null` in queries.
+- Tournament soft-deletes use `deletedAt` field -- always filter with `deletedAt: null` in queries.
 - All Prisma model fields use `@map()` for snake_case DB columns; TypeScript uses camelCase.

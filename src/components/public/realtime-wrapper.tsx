@@ -1,8 +1,8 @@
 "use client";
 
-import { useRealtimeEvent } from "@/hooks/use-realtime-event";
+import { useRealtimeTournament } from "@/hooks/use-realtime-event";
 
-export function RealtimeWrapper({ eventId }: { eventId: string }) {
-  useRealtimeEvent(eventId);
+export function RealtimeWrapper({ tournamentId }: { tournamentId: string }) {
+  useRealtimeTournament(tournamentId);
   return null;
 }

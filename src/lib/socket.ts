@@ -11,13 +11,13 @@ const pusher = new Pusher({
   useTLS: process.env.SOKETI_USE_TLS !== "false",
 });
 
-export async function emitToEvent(
-  eventId: string,
+export async function emitToTournament(
+  tournamentId: string,
   event: string,
   payload: unknown
 ) {
   try {
-    await pusher.trigger(`event.${eventId}`, event, payload);
+    await pusher.trigger(`tournament.${tournamentId}`, event, payload);
   } catch (err) {
     console.error("Failed to emit to Soketi:", err);
   }

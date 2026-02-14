@@ -1,9 +1,8 @@
 import { createTRPCRouter } from "../init";
 import { authRouter } from "./auth";
-import { eventsRouter } from "./events";
+import { tournamentsRouter } from "./tournaments";
 import { locationsRouter } from "./locations";
 import { teamsRouter } from "./teams";
-import { categoriesRouter } from "./categories";
 import { roundsRouter } from "./rounds";
 import { poolsRouter } from "./pools";
 import { gamesRouter } from "./games";
@@ -12,10 +11,9 @@ import { bookingsRouter } from "./bookings";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
-  events: eventsRouter,
+  tournaments: tournamentsRouter,
   locations: locationsRouter,
   teams: teamsRouter,
-  categories: categoriesRouter,
   rounds: roundsRouter,
   pools: poolsRouter,
   games: gamesRouter,

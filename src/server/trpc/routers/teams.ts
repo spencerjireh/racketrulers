@@ -1,31 +1,30 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, createTRPCRouter } from "../init";
-import { verifyEventOwnership } from "../helpers";
+import { verifyTournamentOwnership } from "../helpers";
 
 export const teamsRouter = createTRPCRouter({
   list: protectedProcedure
-    .input(z.object({ eventId: z.string() }))
+    .input(z.object({ tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       return ctx.prisma.team.findMany({
-        where: { eventId: input.eventId },
-        orderBy: { createdAt: "asc" },
+        where: { tournamentId: input.tournamentId },
+        orderBy: { seed: "asc" },
         include: {
           _count: {
-            select: { categoryTeams: true, gamesAsTeam1: true, gamesAsTeam2: true },
+            select: { gamesAsTeam1: true, gamesAsTeam2: true },
           },
         },
       });
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       const team = await ctx.prisma.team.findFirst({
-        where: { id: input.id, eventId: input.eventId },
-        include: { categoryTeams: { include: { category: true } } },
+        where: { id: input.id, tournamentId: input.tournamentId },
       });
       if (!team) throw new TRPCError({ code: "NOT_FOUND" });
       return team;
@@ -34,7 +33,7 @@ export const teamsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        eventId: z.string(),
+        tournamentId: z.string(),
         name: z.string().min(1, "Name is required"),
         captainName: z.string().optional(),
         captainEmail: z.string().email().optional().or(z.literal("")),
@@ -42,17 +41,23 @@ export const teamsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const existing = await ctx.prisma.team.findFirst({
-        where: { eventId: input.eventId, name: input.name },
+        where: { tournamentId: input.tournamentId, name: input.name },
       });
       if (existing) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "A team with this name already exists in this event",
+          message: "A team with this name already exists in this tournament",
         });
       }
+
+      // Auto-assign next seed
+      const maxSeed = await ctx.prisma.team.aggregate({
+        where: { tournamentId: input.tournamentId },
+        _max: { seed: true },
+      });
 
       return ctx.prisma.team.create({
         data: {
@@ -60,7 +65,8 @@ export const teamsRouter = createTRPCRouter({
           captainName: input.captainName || null,
           captainEmail: input.captainEmail || null,
           roster: input.roster || [],
-          eventId: input.eventId,
+          seed: (maxSeed._max.seed ?? 0) + 1,
+          tournamentId: input.tournamentId,
         },
       });
     }),
@@ -69,7 +75,7 @@ export const teamsRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         name: z.string().min(1).optional(),
         captainName: z.string().optional(),
         captainEmail: z.string().email().optional().or(z.literal("")),
@@ -77,12 +83,12 @@ export const teamsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       if (input.name) {
         const existing = await ctx.prisma.team.findFirst({
           where: {
-            eventId: input.eventId,
+            tournamentId: input.tournamentId,
             name: input.name,
             NOT: { id: input.id },
           },
@@ -90,12 +96,12 @@ export const teamsRouter = createTRPCRouter({
         if (existing) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "A team with this name already exists in this event",
+            message: "A team with this name already exists in this tournament",
           });
         }
       }
 
-      const { id, eventId, ...data } = input;
+      const { id, tournamentId, ...data } = input;
       const updateData: Record<string, unknown> = {};
       if (data.name !== undefined) updateData.name = data.name;
       if (data.captainName !== undefined) updateData.captainName = data.captainName || null;
@@ -109,9 +115,9 @@ export const teamsRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const activeGames = await ctx.prisma.game.count({
         where: {
@@ -132,7 +138,7 @@ export const teamsRouter = createTRPCRouter({
   bulkCreate: protectedProcedure
     .input(
       z.object({
-        eventId: z.string(),
+        tournamentId: z.string(),
         teams: z.array(
           z.object({
             name: z.string().min(1),
@@ -143,13 +149,14 @@ export const teamsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const existing = await ctx.prisma.team.findMany({
-        where: { eventId: input.eventId },
-        select: { name: true },
+        where: { tournamentId: input.tournamentId },
+        select: { name: true, seed: true },
       });
       const existingNames = new Set(existing.map((t) => t.name.toLowerCase()));
+      const maxSeed = Math.max(0, ...existing.map((t) => t.seed));
 
       const newTeams = input.teams.filter(
         (t) => !existingNames.has(t.name.toLowerCase())
@@ -163,15 +170,54 @@ export const teamsRouter = createTRPCRouter({
       }
 
       await ctx.prisma.team.createMany({
-        data: newTeams.map((t) => ({
+        data: newTeams.map((t, i) => ({
           name: t.name,
           captainName: t.captainName || null,
           captainEmail: t.captainEmail || null,
           roster: [],
-          eventId: input.eventId,
+          seed: maxSeed + i + 1,
+          tournamentId: input.tournamentId,
         })),
       });
 
       return { created: newTeams.length, skipped: input.teams.length - newTeams.length };
+    }),
+
+  updateSeed: protectedProcedure
+    .input(
+      z.object({
+        tournamentId: z.string(),
+        teamId: z.string(),
+        seed: z.number().int().min(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+
+      return ctx.prisma.team.update({
+        where: { id: input.teamId },
+        data: { seed: input.seed },
+      });
+    }),
+
+  randomizeSeeds: protectedProcedure
+    .input(z.object({ tournamentId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+
+      const teams = await ctx.prisma.team.findMany({
+        where: { tournamentId: input.tournamentId },
+      });
+
+      const shuffled = [...teams].sort(() => Math.random() - 0.5);
+
+      await ctx.prisma.$transaction(
+        shuffled.map((t, index) =>
+          ctx.prisma.team.update({
+            where: { id: t.id },
+            data: { seed: index + 1 },
+          })
+        )
+      );
     }),
 });

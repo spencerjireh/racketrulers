@@ -5,6 +5,12 @@ interface GameSeed {
   poolId: string | null;
   feederGame1Id?: string;
   feederGame2Id?: string;
+  /** Positional index into the returned array -- the game whose winner feeds into team1 */
+  feederIndex1?: number;
+  /** Positional index into the returned array -- the game whose winner feeds into team2 */
+  feederIndex2?: number;
+  /** Which bracket round this game belongs to (0-based) */
+  bracketRound?: number;
   bracketType?: "winners" | "losers" | "grand_finals";
 }
 
@@ -80,25 +86,14 @@ export function generateSingleElimGames(
     const t1 = seed1 <= n ? teamIds[seed1 - 1] : null;
     const t2 = seed2 <= n ? teamIds[seed2 - 1] : null;
 
-    // If one team is a bye, skip this game (winner advances automatically)
-    if (t1 === null || t2 === null) {
-      // We still create the game entry but it will be auto-resolved
-      firstRound.push({ position, index: games.length });
-      games.push({
-        team1Id: t1,
-        team2Id: t2,
-        roundPosition: position++,
-        poolId: null,
-      });
-    } else {
-      firstRound.push({ position: position, index: games.length });
-      games.push({
-        team1Id: t1,
-        team2Id: t2,
-        roundPosition: position++,
-        poolId: null,
-      });
-    }
+    firstRound.push({ position, index: games.length });
+    games.push({
+      team1Id: t1,
+      team2Id: t2,
+      roundPosition: position++,
+      poolId: null,
+      bracketRound: 0,
+    });
   }
   roundGames.set(0, firstRound);
 
@@ -132,6 +127,9 @@ export function generateSingleElimGames(
         team2Id: auto2,
         roundPosition: position++,
         poolId: null,
+        feederIndex1: feeder1.index,
+        feederIndex2: feeder2.index,
+        bracketRound: round,
       });
     }
     roundGames.set(round, thisRound);

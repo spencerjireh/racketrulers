@@ -20,7 +20,7 @@ model User {
 
   accounts     Account[]
   sessions     Session[]
-  events       Event[]
+  tournaments  Tournament[]
   coachProfile CoachProfile?
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -75,7 +75,7 @@ model VerificationToken {
 
 // ─── Tournament Models ───────────────────────────────────────────────────────
 
-enum EventStatus {
+enum TournamentStatus {
   DRAFT
   PUBLISHED
   COMPLETED
@@ -83,56 +83,40 @@ enum EventStatus {
   @@map("event_status")
 }
 
-model Event {
-  id          String      @id @default(cuid())
+model Tournament {
+  id          String           @id @default(cuid())
   name        String
-  slug        String      @unique
+  slug        String           @unique
   description String?
-  bannerUrl   String?     @map("banner_url")
-  status      EventStatus @default(DRAFT)
-  timezone    String      @default("America/Toronto")
-  startDate   DateTime    @map("start_date")
-  endDate     DateTime    @map("end_date")
+  bannerUrl   String?          @map("banner_url")
+  status      TournamentStatus @default(DRAFT)
+  timezone    String           @default("America/Toronto")
+  startDate   DateTime         @map("start_date")
+  endDate     DateTime         @map("end_date")
 
-  pointsConfig  Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
-  scoringConfig  Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
-  scheduleConfig Json @default("{\"slotDuration\": 30, \"dayStartHour\": 8, \"dayEndHour\": 20}") @map("schedule_config")
+  format       RoundType?
+  drawsAllowed Boolean @default(false) @map("draws_allowed")
+
+  pointsConfig     Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
+  scoringConfig    Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
+  scheduleConfig   Json @default("{\"slotDuration\": 30, \"dayStartHour\": 8, \"dayEndHour\": 20}") @map("schedule_config")
+  tiebreakerConfig Json @default("{\"order\": [\"win_loss\", \"head_to_head\", \"point_differential\", \"points_scored\"]}") @map("tiebreaker_config")
 
   ownerId String @map("owner_id")
   owner   User   @relation(fields: [ownerId], references: [id])
 
   deletedAt DateTime? @map("deleted_at")
 
-  categories Category[]
-  teams      Team[]
-  locations  Location[]
+  rounds    Round[]
+  teams     Team[]
+  locations Location[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([ownerId])
   @@index([deletedAt])
-  @@map("events")
-}
-
-model Category {
-  id   String @id @default(cuid())
-  name String
-  order Int   @default(0)
-
-  tiebreakerConfig Json @default("{\"order\": [\"win_loss\", \"head_to_head\", \"point_differential\", \"points_scored\"]}") @map("tiebreaker_config")
-  drawsAllowed     Boolean @default(false) @map("draws_allowed")
-
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  rounds        Round[]
-  categoryTeams CategoryTeam[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("categories")
+  @@map("tournaments")
 }
 
 enum RoundType {
@@ -156,8 +140,8 @@ model Round {
   drawsAllowed     Boolean @default(false) @map("draws_allowed")
   confirmed        Boolean @default(false)
 
-  categoryId String   @map("category_id")
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tournamentId String     @map("tournament_id")
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   pools Pool[]
   games Game[]
@@ -263,14 +247,14 @@ model Team {
   captainName  String? @map("captain_name")
   captainEmail String? @map("captain_email")
   roster       Json    @default("[]")
+  seed         Int     @default(0)
 
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tournamentId String     @map("tournament_id")
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
-  categoryTeams CategoryTeam[]
-  poolTeams     PoolTeam[]
-  gamesAsTeam1  Game[]         @relation("GameTeam1")
-  gamesAsTeam2  Game[]         @relation("GameTeam2")
+  poolTeams    PoolTeam[]
+  gamesAsTeam1 Game[]     @relation("GameTeam1")
+  gamesAsTeam2 Game[]     @relation("GameTeam2")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -278,26 +262,12 @@ model Team {
   @@map("teams")
 }
 
-model CategoryTeam {
-  id   String @id @default(cuid())
-  seed Int    @default(0)
-
-  categoryId String   @map("category_id")
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  teamId String @map("team_id")
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@unique([categoryId, teamId])
-  @@map("category_teams")
-}
-
 model Location {
   id   String @id @default(cuid())
   name String
 
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tournamentId String     @map("tournament_id")
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   games Game[]
 

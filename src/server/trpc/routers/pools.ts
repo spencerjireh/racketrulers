@@ -1,15 +1,15 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, createTRPCRouter } from "../init";
-import { verifyEventOwnership, verifyRoundOwnership } from "../helpers";
+import { verifyTournamentOwnership, verifyRoundOwnership } from "../helpers";
 
 export const poolsRouter = createTRPCRouter({
   list: protectedProcedure
-    .input(z.object({ roundId: z.string(), eventId: z.string() }))
+    .input(z.object({ roundId: z.string(), tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       return ctx.prisma.pool.findMany({
-        where: { roundId: input.roundId, round: { category: { eventId: input.eventId } } },
+        where: { roundId: input.roundId, round: { tournamentId: input.tournamentId } },
         orderBy: { createdAt: "asc" },
         include: {
           poolTeams: {
@@ -24,7 +24,7 @@ export const poolsRouter = createTRPCRouter({
     .input(
       z.object({
         roundId: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         name: z.string().min(1, "Name is required"),
       })
     )
@@ -32,7 +32,7 @@ export const poolsRouter = createTRPCRouter({
       const { round } = await verifyRoundOwnership(
         ctx.prisma,
         input.roundId,
-        input.eventId,
+        input.tournamentId,
         ctx.userId
       );
       if (round.type !== "ROUND_ROBIN") {
@@ -48,9 +48,9 @@ export const poolsRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       return ctx.prisma.pool.delete({ where: { id: input.id } });
     }),
 
@@ -58,31 +58,22 @@ export const poolsRouter = createTRPCRouter({
     .input(
       z.object({
         poolId: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         teamId: z.string(),
         seed: z.number().int().min(0).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      // Verify team belongs to the category
-      const pool = await ctx.prisma.pool.findUnique({
-        where: { id: input.poolId },
-        include: { round: { include: { category: true } } },
+      // Verify team belongs to the tournament
+      const team = await ctx.prisma.team.findFirst({
+        where: { id: input.teamId, tournamentId: input.tournamentId },
       });
-      if (!pool) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const inCategory = await ctx.prisma.categoryTeam.findFirst({
-        where: {
-          categoryId: pool.round.categoryId,
-          teamId: input.teamId,
-        },
-      });
-      if (!inCategory) {
+      if (!team) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Team must be assigned to the category first",
+          message: "Team must belong to this tournament",
         });
       }
 
@@ -99,12 +90,12 @@ export const poolsRouter = createTRPCRouter({
     .input(
       z.object({
         poolId: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         teamId: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       return ctx.prisma.poolTeam.delete({
         where: {
           poolId_teamId: {
@@ -119,28 +110,28 @@ export const poolsRouter = createTRPCRouter({
     .input(
       z.object({
         roundId: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         poolCount: z.number().int().min(1),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { round } = await verifyRoundOwnership(
+      await verifyRoundOwnership(
         ctx.prisma,
         input.roundId,
-        input.eventId,
+        input.tournamentId,
         ctx.userId
       );
 
-      // Get category teams ordered by seed
-      const categoryTeams = await ctx.prisma.categoryTeam.findMany({
-        where: { categoryId: round.categoryId },
+      // Get tournament teams ordered by seed
+      const teams = await ctx.prisma.team.findMany({
+        where: { tournamentId: input.tournamentId },
         orderBy: { seed: "asc" },
       });
 
-      if (categoryTeams.length === 0) {
+      if (teams.length === 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "No teams assigned to this category",
+          message: "No teams in this tournament",
         });
       }
 
@@ -164,10 +155,10 @@ export const poolsRouter = createTRPCRouter({
       let poolIndex = 0;
       let direction = 1;
 
-      for (let i = 0; i < categoryTeams.length; i++) {
+      for (let i = 0; i < teams.length; i++) {
         assignments.push({
           poolId: pools[poolIndex].id,
-          teamId: categoryTeams[i].teamId,
+          teamId: teams[i].id,
           seed: Math.floor(i / input.poolCount) + 1,
         });
 

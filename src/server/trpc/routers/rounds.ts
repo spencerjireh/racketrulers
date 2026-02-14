@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import type { Prisma } from "@prisma/client";
 import { protectedProcedure, createTRPCRouter } from "../init";
-import { verifyEventOwnership, verifyCategoryOwnership } from "../helpers";
+import { verifyTournamentOwnership } from "../helpers";
 import {
   generateRoundRobinGames,
   generateSingleElimGames,
@@ -12,11 +12,11 @@ import {
 
 export const roundsRouter = createTRPCRouter({
   list: protectedProcedure
-    .input(z.object({ categoryId: z.string(), eventId: z.string() }))
+    .input(z.object({ tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       return ctx.prisma.round.findMany({
-        where: { categoryId: input.categoryId, category: { eventId: input.eventId } },
+        where: { tournamentId: input.tournamentId },
         orderBy: { order: "asc" },
         include: {
           _count: { select: { pools: true, games: true } },
@@ -25,11 +25,11 @@ export const roundsRouter = createTRPCRouter({
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
       const round = await ctx.prisma.round.findFirst({
-        where: { id: input.id, category: { eventId: input.eventId } },
+        where: { id: input.id, tournamentId: input.tournamentId },
         include: {
           pools: {
             include: {
@@ -49,8 +49,7 @@ export const roundsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        categoryId: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         name: z.string().min(1, "Name is required"),
         type: z.enum(["ROUND_ROBIN", "SINGLE_ELIM", "DOUBLE_ELIM", "SWISS", "CUSTOM"]),
         drawsAllowed: z.boolean().optional(),
@@ -58,15 +57,14 @@ export const roundsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyCategoryOwnership(
+      await verifyTournamentOwnership(
         ctx.prisma,
-        input.categoryId,
-        input.eventId,
+        input.tournamentId,
         ctx.userId
       );
 
       const maxOrder = await ctx.prisma.round.aggregate({
-        where: { categoryId: input.categoryId },
+        where: { tournamentId: input.tournamentId },
         _max: { order: true },
       });
 
@@ -77,7 +75,7 @@ export const roundsRouter = createTRPCRouter({
           drawsAllowed: input.drawsAllowed ?? false,
           config: (input.config as Prisma.InputJsonValue) ?? undefined,
           order: (maxOrder._max.order ?? -1) + 1,
-          categoryId: input.categoryId,
+          tournamentId: input.tournamentId,
         },
       });
     }),
@@ -86,16 +84,16 @@ export const roundsRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         name: z.string().min(1).optional(),
         drawsAllowed: z.boolean().optional(),
         config: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const { id, eventId, ...data } = input;
+      const { id, tournamentId, ...data } = input;
       const updateData: Record<string, unknown> = {};
       if (data.name !== undefined) updateData.name = data.name;
       if (data.drawsAllowed !== undefined) updateData.drawsAllowed = data.drawsAllowed;
@@ -105,9 +103,9 @@ export const roundsRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const inProgress = await ctx.prisma.game.count({
         where: { roundId: input.id, status: "IN_PROGRESS" },
@@ -123,26 +121,27 @@ export const roundsRouter = createTRPCRouter({
     }),
 
   generateGames: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const round = await ctx.prisma.round.findFirst({
-        where: { id: input.id, category: { eventId: input.eventId } },
+        where: { id: input.id, tournamentId: input.tournamentId },
         include: {
           pools: {
             include: {
               poolTeams: { orderBy: { seed: "asc" }, include: { team: true } },
             },
           },
-          category: {
-            include: {
-              categoryTeams: { orderBy: { seed: "asc" } },
-            },
-          },
         },
       });
       if (!round) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Get tournament teams sorted by seed
+      const teams = await ctx.prisma.team.findMany({
+        where: { tournamentId: input.tournamentId },
+        orderBy: { seed: "asc" },
+      });
 
       const existingGames = await ctx.prisma.game.count({
         where: { roundId: input.id },
@@ -192,7 +191,7 @@ export const roundsRouter = createTRPCRouter({
       }
 
       if (round.type === "SINGLE_ELIM") {
-        const teamIds = round.category.categoryTeams.map((ct) => ct.teamId);
+        const teamIds = teams.map((t) => t.id);
         if (teamIds.length < 2) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -202,10 +201,11 @@ export const roundsRouter = createTRPCRouter({
 
         const consolation =
           (round.config as Record<string, unknown>)?.consolation_match === true;
-        const games = generateSingleElimGames(teamIds, consolation);
+        const gameSeeds = generateSingleElimGames(teamIds, consolation);
 
+        // Pass 1: Create all games without feeder links
         const createdIds: string[] = [];
-        for (const g of games) {
+        for (const g of gameSeeds) {
           const created = await ctx.prisma.game.create({
             data: {
               team1Id: g.team1Id,
@@ -218,11 +218,54 @@ export const roundsRouter = createTRPCRouter({
           createdIds.push(created.id);
         }
 
+        // Pass 2: Link feeder games using positional indices
+        const feederUpdates = gameSeeds
+          .map((g, i) => ({ seed: g, dbId: createdIds[i] }))
+          .filter(({ seed }) => seed.feederIndex1 != null || seed.feederIndex2 != null);
+
+        if (feederUpdates.length > 0) {
+          await Promise.all(
+            feederUpdates.map(({ seed, dbId }) =>
+              ctx.prisma.game.update({
+                where: { id: dbId },
+                data: {
+                  feederGame1Id: seed.feederIndex1 != null ? createdIds[seed.feederIndex1] : undefined,
+                  feederGame2Id: seed.feederIndex2 != null ? createdIds[seed.feederIndex2] : undefined,
+                },
+              })
+            )
+          );
+        }
+
+        // Pass 3: Auto-complete bye games (exactly one team is null)
+        const byeGames = gameSeeds
+          .map((g, i) => ({ seed: g, dbId: createdIds[i] }))
+          .filter(
+            ({ seed }) =>
+              (seed.team1Id === null) !== (seed.team2Id === null)
+          );
+
+        if (byeGames.length > 0) {
+          await Promise.all(
+            byeGames.map(({ seed, dbId }) => {
+              return ctx.prisma.game.update({
+                where: { id: dbId },
+                data: {
+                  status: "COMPLETED",
+                  scoreTeam1: seed.team1Id ? 1 : 0,
+                  scoreTeam2: seed.team2Id ? 1 : 0,
+                  setScores: [{ team1: seed.team1Id ? 21 : 0, team2: seed.team2Id ? 21 : 0 }],
+                },
+              });
+            })
+          );
+        }
+
         return { gamesCreated: createdIds.length };
       }
 
       if (round.type === "DOUBLE_ELIM") {
-        const teamIds = round.category.categoryTeams.map((ct) => ct.teamId);
+        const teamIds = teams.map((t) => t.id);
         if (teamIds.length < 2) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -252,7 +295,7 @@ export const roundsRouter = createTRPCRouter({
       }
 
       if (round.type === "SWISS") {
-        const teamIds = round.category.categoryTeams.map((ct) => ct.teamId);
+        const teamIds = teams.map((t) => t.id);
         if (teamIds.length < 2) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -281,9 +324,9 @@ export const roundsRouter = createTRPCRouter({
     }),
 
   clearGames: protectedProcedure
-    .input(z.object({ id: z.string(), eventId: z.string() }))
+    .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const blocked = await ctx.prisma.game.count({
         where: {
@@ -305,15 +348,15 @@ export const roundsRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        eventId: z.string(),
+        tournamentId: z.string(),
         force: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyEventOwnership(ctx.prisma, input.eventId, ctx.userId);
+      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       const round = await ctx.prisma.round.findFirst({
-        where: { id: input.id, category: { eventId: input.eventId } },
+        where: { id: input.id, tournamentId: input.tournamentId },
       });
       if (!round) throw new TRPCError({ code: "NOT_FOUND" });
 

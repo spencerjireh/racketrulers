@@ -6,14 +6,14 @@ import { GameCard } from "./game-card";
 import { LoadingState } from "@/components/ui/loading-state";
 
 interface PublicScheduleViewProps {
-  eventId: string;
+  tournamentId: string;
 }
 
-export function PublicScheduleView({ eventId }: PublicScheduleViewProps) {
+export function PublicScheduleView({ tournamentId }: PublicScheduleViewProps) {
   const trpc = useTRPC();
 
   const { data: games, isLoading } = useQuery(
-    trpc.games.listByEventPublic.queryOptions({ eventId })
+    trpc.games.listByTournamentPublic.queryOptions({ tournamentId })
   );
 
   if (isLoading) {
@@ -28,59 +28,42 @@ export function PublicScheduleView({ eventId }: PublicScheduleViewProps) {
     );
   }
 
-  // Group by category -> round
+  // Group by round
   const grouped = new Map<
     string,
-    {
-      categoryName: string;
-      rounds: Map<string, { roundName: string; games: typeof games }>;
-    }
+    { roundName: string; games: typeof games }
   >();
 
   for (const game of games) {
-    const catId = game.round.category.id;
-    const catName = game.round.category.name;
-    if (!grouped.has(catId)) {
-      grouped.set(catId, { categoryName: catName, rounds: new Map() });
-    }
-    const catGroup = grouped.get(catId)!;
-
     const roundId = game.round.id;
-    if (!catGroup.rounds.has(roundId)) {
-      catGroup.rounds.set(roundId, { roundName: game.round.name, games: [] });
+    if (!grouped.has(roundId)) {
+      grouped.set(roundId, { roundName: game.round.name, games: [] });
     }
-    catGroup.rounds.get(roundId)!.games!.push(game);
+    grouped.get(roundId)!.games.push(game);
   }
 
   return (
     <div className="space-y-6">
-      {Array.from(grouped.entries()).map(([catId, catGroup]) => (
-        <div key={catId} className="space-y-3">
-          <h2 className="text-lg font-semibold">{catGroup.categoryName}</h2>
-          {Array.from(catGroup.rounds.entries()).map(([roundId, roundGroup]) => (
-            <div key={roundId} className="space-y-2">
-              <h3 className="text-sm font-medium text-muted-foreground">
-                {roundGroup.roundName}
-              </h3>
-              <div className="grid gap-2 md:grid-cols-2">
-                {roundGroup.games!.map((game) => (
-                  <GameCard
-                    key={game.id}
-                    team1Name={game.team1?.name ?? "TBD"}
-                    team2Name={game.team2?.name ?? "TBD"}
-                    scoreTeam1={game.scoreTeam1}
-                    scoreTeam2={game.scoreTeam2}
-                    setScores={game.setScores as { team1: number; team2: number }[] | null}
-                    matchType={game.matchType}
-                    status={game.status}
-                    scheduledAt={game.scheduledAt}
-                    locationName={game.location?.name ?? null}
-                    poolName={game.pool?.name ?? null}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+      {Array.from(grouped.entries()).map(([roundId, roundGroup]) => (
+        <div key={roundId} className="space-y-2">
+          <h2 className="text-lg font-semibold">{roundGroup.roundName}</h2>
+          <div className="grid gap-2 md:grid-cols-2">
+            {roundGroup.games.map((game) => (
+              <GameCard
+                key={game.id}
+                team1Name={game.team1?.name ?? "TBD"}
+                team2Name={game.team2?.name ?? "TBD"}
+                scoreTeam1={game.scoreTeam1}
+                scoreTeam2={game.scoreTeam2}
+                setScores={game.setScores as { team1: number; team2: number }[] | null}
+                matchType={game.matchType}
+                status={game.status}
+                scheduledAt={game.scheduledAt}
+                locationName={game.location?.name ?? null}
+                poolName={game.pool?.name ?? null}
+              />
+            ))}
+          </div>
         </div>
       ))}
     </div>
