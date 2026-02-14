@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MatchCard, type MatchCardGame } from "./match-card";
 import { ScoreEntryDialog } from "./score-entry-dialog";
+import { CascadeWarningDialog } from "./cascade-warning-dialog";
 import {
   computeBracketLayout,
   CARD_WIDTH,
@@ -55,6 +56,12 @@ export function BracketView({
   const queryClient = useQueryClient();
   const [zoom, setZoom] = useState(1.0);
   const [scoringGame, setScoringGame] = useState<MatchCardGame | null>(null);
+  const [cascadeInfo, setCascadeInfo] = useState<{
+    downstreamCount: number;
+    scoredCount: number;
+    gameId: string;
+  } | null>(null);
+  const lastSubmittedScores = useRef<{ team1: number; team2: number }[]>([]);
   const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
 
   const queryKey = interactive ? "getBracketData" : "getBracketDataPublic";
@@ -106,9 +113,25 @@ export function BracketView({
       onSuccess: () => {
         invalidateBracket();
         setScoringGame(null);
+        setCascadeInfo(null);
         toast.success("Score saved");
       },
-      onError: (err) => toast.error(err.message),
+      onError: (err) => {
+        try {
+          const parsed = JSON.parse(err.message);
+          if (parsed.type === "CASCADE_REQUIRED" && scoringGame) {
+            setCascadeInfo({
+              downstreamCount: parsed.downstreamCount,
+              scoredCount: parsed.scoredCount,
+              gameId: scoringGame.id,
+            });
+            return;
+          }
+        } catch {
+          // Not a cascade error
+        }
+        toast.error(err.message);
+      },
     })
   );
 
@@ -275,47 +298,70 @@ export function BracketView({
 
         {/* Score entry dialog (interactive mode only) */}
         {interactive && (
-          <ScoreEntryDialog
-            open={!!scoringGame}
-            onOpenChange={(open) => {
-              if (!open) setScoringGame(null);
-            }}
-            onSubmit={(data) => {
-              if (scoringGame) {
-                updateScore.mutate({
-                  id: scoringGame.id,
-                  tournamentId,
-                  setScores: data.setScores,
-                });
+          <>
+            <ScoreEntryDialog
+              open={!!scoringGame}
+              onOpenChange={(open) => {
+                if (!open) setScoringGame(null);
+              }}
+              onSubmit={(data) => {
+                if (scoringGame) {
+                  lastSubmittedScores.current = data.setScores;
+                  updateScore.mutate({
+                    id: scoringGame.id,
+                    tournamentId,
+                    setScores: data.setScores,
+                  });
+                }
+              }}
+              onForfeit={(winnerId) => {
+                if (scoringGame) {
+                  updateStatus.mutate({
+                    id: scoringGame.id,
+                    tournamentId,
+                    status: "FORFEIT",
+                    forfeitWinnerId: winnerId,
+                  });
+                }
+              }}
+              onCancel={() => {
+                if (scoringGame) {
+                  updateStatus.mutate({
+                    id: scoringGame.id,
+                    tournamentId,
+                    status: "CANCELLED",
+                  });
+                }
+              }}
+              team1={scoringGame?.team1 ?? null}
+              team2={scoringGame?.team2 ?? null}
+              scoringConfig={config}
+              currentSetScores={
+                scoringGame?.setScores as SetScore[] | null | undefined
               }
-            }}
-            onForfeit={(winnerId) => {
-              if (scoringGame) {
-                updateStatus.mutate({
-                  id: scoringGame.id,
-                  tournamentId,
-                  status: "FORFEIT",
-                  forfeitWinnerId: winnerId,
-                });
-              }
-            }}
-            onCancel={() => {
-              if (scoringGame) {
-                updateStatus.mutate({
-                  id: scoringGame.id,
-                  tournamentId,
-                  status: "CANCELLED",
-                });
-              }
-            }}
-            team1={scoringGame?.team1 ?? null}
-            team2={scoringGame?.team2 ?? null}
-            scoringConfig={config}
-            currentSetScores={
-              scoringGame?.setScores as SetScore[] | null | undefined
-            }
-            isPending={updateScore.isPending || updateStatus.isPending}
-          />
+              isPending={updateScore.isPending || updateStatus.isPending}
+            />
+
+            <CascadeWarningDialog
+              open={!!cascadeInfo}
+              onOpenChange={(open) => {
+                if (!open) setCascadeInfo(null);
+              }}
+              onConfirm={() => {
+                if (cascadeInfo) {
+                  updateScore.mutate({
+                    id: cascadeInfo.gameId,
+                    tournamentId,
+                    setScores: lastSubmittedScores.current,
+                    confirmCascade: true,
+                  });
+                }
+              }}
+              downstreamCount={cascadeInfo?.downstreamCount ?? 0}
+              scoredCount={cascadeInfo?.scoredCount ?? 0}
+              isPending={updateScore.isPending}
+            />
+          </>
         )}
       </div>
     </TooltipProvider>

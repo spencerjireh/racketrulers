@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { GameStatusBadge } from "./game-status-badge";
 import { ScoreEntryDialog } from "./score-entry-dialog";
+import { CascadeWarningDialog } from "./cascade-warning-dialog";
 
 interface SetScore {
   team1: number;
@@ -72,6 +73,15 @@ export function GamesList({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [scoringGame, setScoringGame] = useState<Game | null>(null);
+  const [cascadeInfo, setCascadeInfo] = useState<{
+    downstreamCount: number;
+    scoredCount: number;
+    pendingSetScores: { team1: number; team2: number }[];
+    gameId: string;
+    type: "score" | "reset";
+  } | null>(null);
+  const [pendingResetGameId, setPendingResetGameId] = useState<string | null>(null);
+  const lastSubmittedScores = useRef<{ team1: number; team2: number }[]>([]);
   const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
 
   const invalidateGames = () => {
@@ -91,9 +101,27 @@ export function GamesList({
       onSuccess: () => {
         invalidateGames();
         setScoringGame(null);
+        setCascadeInfo(null);
         toast.success("Score saved");
       },
-      onError: (err) => toast.error(err.message),
+      onError: (err) => {
+        try {
+          const parsed = JSON.parse(err.message);
+          if (parsed.type === "CASCADE_REQUIRED" && scoringGame) {
+            setCascadeInfo({
+              downstreamCount: parsed.downstreamCount,
+              scoredCount: parsed.scoredCount,
+              pendingSetScores: lastSubmittedScores.current,
+              gameId: scoringGame.id,
+              type: "score",
+            });
+            return;
+          }
+        } catch {
+          // Not a cascade error
+        }
+        toast.error(err.message);
+      },
     })
   );
 
@@ -112,9 +140,29 @@ export function GamesList({
     trpc.games.resetScore.mutationOptions({
       onSuccess: () => {
         invalidateGames();
+        setCascadeInfo(null);
+        setPendingResetGameId(null);
         toast.success("Score reset");
       },
-      onError: (err) => toast.error(err.message),
+      onError: (err) => {
+        try {
+          const parsed = JSON.parse(err.message);
+          if (parsed.type === "CASCADE_REQUIRED" && pendingResetGameId) {
+            setCascadeInfo({
+              downstreamCount: parsed.downstreamCount,
+              scoredCount: parsed.scoredCount,
+              pendingSetScores: [],
+              gameId: pendingResetGameId,
+              type: "reset",
+            });
+            return;
+          }
+        } catch {
+          // Not a cascade error
+        }
+        setPendingResetGameId(null);
+        toast.error(err.message);
+      },
     })
   );
 
@@ -203,16 +251,17 @@ export function GamesList({
                     className="h-7 text-xs"
                     onClick={() => setScoringGame(game)}
                   >
-                    Score
+                    {game.status === "COMPLETED" ? "Edit" : "Score"}
                   </Button>
                   {game.status === "COMPLETED" && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-7 text-xs"
-                      onClick={() =>
-                        resetScore.mutate({ id: game.id, tournamentId })
-                      }
+                      onClick={() => {
+                        setPendingResetGameId(game.id);
+                        resetScore.mutate({ id: game.id, tournamentId });
+                      }}
                     >
                       Reset
                     </Button>
@@ -231,6 +280,7 @@ export function GamesList({
         }}
         onSubmit={(data) => {
           if (scoringGame) {
+            lastSubmittedScores.current = data.setScores;
             updateScore.mutate({
               id: scoringGame.id,
               tournamentId,
@@ -262,6 +312,33 @@ export function GamesList({
         scoringConfig={config}
         currentSetScores={scoringGame?.setScores as SetScore[] | null | undefined}
         isPending={updateScore.isPending || updateStatus.isPending}
+      />
+
+      <CascadeWarningDialog
+        open={!!cascadeInfo}
+        onOpenChange={(open) => {
+          if (!open) setCascadeInfo(null);
+        }}
+        onConfirm={() => {
+          if (!cascadeInfo) return;
+          if (cascadeInfo.type === "reset") {
+            resetScore.mutate({
+              id: cascadeInfo.gameId,
+              tournamentId,
+              confirmCascade: true,
+            });
+          } else {
+            updateScore.mutate({
+              id: cascadeInfo.gameId,
+              tournamentId,
+              setScores: cascadeInfo.pendingSetScores,
+              confirmCascade: true,
+            });
+          }
+        }}
+        downstreamCount={cascadeInfo?.downstreamCount ?? 0}
+        scoredCount={cascadeInfo?.scoredCount ?? 0}
+        isPending={updateScore.isPending || resetScore.isPending}
       />
     </>
   );

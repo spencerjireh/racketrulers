@@ -15,6 +15,8 @@ import {
   type SetScore,
   DEFAULT_SCORING_CONFIG,
 } from "@/server/lib/scoring-validation";
+import { generateSchedule } from "@/server/lib/schedule-generation";
+import { analyzeCascade, getGamesToClear } from "@/server/lib/bracket-cascade";
 
 function getBracketRoundLabel(roundIndex: number, totalRounds: number): string {
   const remaining = totalRounds - roundIndex;
@@ -199,6 +201,7 @@ export const gamesRouter = createTRPCRouter({
             team2: z.number().int().min(0),
           })
         ),
+        confirmCascade: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -220,59 +223,155 @@ export const gamesRouter = createTRPCRouter({
         });
       }
 
-      const game = await ctx.prisma.game.update({
+      const newWinnerId =
+        validation.setsWon.team1 > validation.setsWon.team2
+          ? (await ctx.prisma.game.findUnique({ where: { id: input.id }, select: { team1Id: true } }))?.team1Id ?? null
+          : (await ctx.prisma.game.findUnique({ where: { id: input.id }, select: { team2Id: true } }))?.team2Id ?? null;
+
+      // Fetch current game state to check for winner change
+      const currentGame = await ctx.prisma.game.findUnique({
         where: { id: input.id },
-        data: {
-          setScores: input.setScores,
-          scoreTeam1: validation.setsWon.team1,
-          scoreTeam2: validation.setsWon.team2,
-          status: "COMPLETED",
-        },
         include: { round: true },
       });
+      if (!currentGame) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // For single elim: advance winner to next bracket game
-      if (game.round.type === "SINGLE_ELIM") {
-        const winnerId =
-          validation.setsWon.team1 > validation.setsWon.team2
-            ? game.team1Id
-            : game.team2Id;
+      const isBracket = currentGame.round.type === "SINGLE_ELIM" || currentGame.round.type === "DOUBLE_ELIM";
 
-        const nextGames = await ctx.prisma.game.findMany({
-          where: {
-            OR: [
-              { feederGame1Id: game.id },
-              { feederGame2Id: game.id },
-            ],
+      // Determine old winner (if game was already completed)
+      let oldWinnerId: string | null = null;
+      if (currentGame.status === "COMPLETED" || currentGame.status === "FORFEIT") {
+        if (currentGame.scoreTeam1 !== null && currentGame.scoreTeam2 !== null) {
+          oldWinnerId = currentGame.scoreTeam1 > currentGame.scoreTeam2
+            ? currentGame.team1Id
+            : currentGame.team2Id;
+        }
+      }
+
+      // Cascade check for bracket games with winner change
+      if (isBracket && oldWinnerId !== null && oldWinnerId !== newWinnerId) {
+        const allGames = await ctx.prisma.game.findMany({
+          where: { roundId: currentGame.roundId },
+          select: {
+            id: true, team1Id: true, team2Id: true,
+            status: true, scoreTeam1: true, scoreTeam2: true,
+            feederGame1Id: true, feederGame2Id: true,
           },
         });
 
-        for (const next of nextGames) {
-          if (next.feederGame1Id === game.id) {
-            await ctx.prisma.game.update({
-              where: { id: next.id },
-              data: { team1Id: winnerId },
-            });
+        const cascade = analyzeCascade(input.id, oldWinnerId, newWinnerId, allGames);
+
+        if (cascade.scoredDownstreamGames.length > 0 && !input.confirmCascade) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: JSON.stringify({
+              type: "CASCADE_REQUIRED",
+              downstreamCount: cascade.downstreamGames.length,
+              scoredCount: cascade.scoredDownstreamGames.length,
+            }),
+          });
+        }
+
+        // Execute cascade in transaction
+        const clearActions = getGamesToClear(input.id, allGames);
+
+        await ctx.prisma.$transaction(async (tx) => {
+          // Update the edited game's score
+          await tx.game.update({
+            where: { id: input.id },
+            data: {
+              setScores: input.setScores,
+              scoreTeam1: validation.setsWon.team1,
+              scoreTeam2: validation.setsWon.team2,
+              status: "COMPLETED",
+            },
+          });
+
+          // Clear downstream games
+          for (const action of clearActions) {
+            const clearData: Record<string, unknown> = {};
+            if (action.clearTeam1) clearData.team1Id = null;
+            if (action.clearTeam2) clearData.team2Id = null;
+            if (action.clearScores) {
+              clearData.scoreTeam1 = null;
+              clearData.scoreTeam2 = null;
+              clearData.setScores = Prisma.DbNull;
+              clearData.status = "SCHEDULED";
+            }
+            await tx.game.update({ where: { id: action.gameId }, data: clearData });
           }
-          if (next.feederGame2Id === game.id) {
-            await ctx.prisma.game.update({
-              where: { id: next.id },
-              data: { team2Id: winnerId },
-            });
+
+          // Re-advance new winner to immediate downstream games
+          const nextGames = await tx.game.findMany({
+            where: {
+              OR: [
+                { feederGame1Id: input.id },
+                { feederGame2Id: input.id },
+              ],
+            },
+          });
+          for (const next of nextGames) {
+            if (next.feederGame1Id === input.id) {
+              await tx.game.update({ where: { id: next.id }, data: { team1Id: newWinnerId } });
+            }
+            if (next.feederGame2Id === input.id) {
+              await tx.game.update({ where: { id: next.id }, data: { team2Id: newWinnerId } });
+            }
+          }
+        });
+      } else {
+        // No cascade needed -- simple update + advance
+        await ctx.prisma.game.update({
+          where: { id: input.id },
+          data: {
+            setScores: input.setScores,
+            scoreTeam1: validation.setsWon.team1,
+            scoreTeam2: validation.setsWon.team2,
+            status: "COMPLETED",
+          },
+        });
+
+        if (isBracket) {
+          const nextGames = await ctx.prisma.game.findMany({
+            where: {
+              OR: [
+                { feederGame1Id: input.id },
+                { feederGame2Id: input.id },
+              ],
+            },
+          });
+
+          for (const next of nextGames) {
+            if (next.feederGame1Id === input.id) {
+              await ctx.prisma.game.update({
+                where: { id: next.id },
+                data: { team1Id: newWinnerId },
+              });
+            }
+            if (next.feederGame2Id === input.id) {
+              await ctx.prisma.game.update({
+                where: { id: next.id },
+                data: { team2Id: newWinnerId },
+              });
+            }
           }
         }
       }
 
+      const updatedGame = await ctx.prisma.game.findUnique({
+        where: { id: input.id },
+        include: { round: true },
+      });
+
       emitToTournament(input.tournamentId, "score:updated", {
-        gameId: game.id,
-        roundId: game.roundId,
-        poolId: game.poolId,
+        gameId: input.id,
+        roundId: currentGame.roundId,
+        poolId: currentGame.poolId,
         scoreTeam1: validation.setsWon.team1,
         scoreTeam2: validation.setsWon.team2,
         status: "COMPLETED",
       }).catch(() => {});
 
-      return game;
+      return updatedGame;
     }),
 
   updateStatus: protectedProcedure
@@ -402,19 +501,212 @@ export const gamesRouter = createTRPCRouter({
     }),
 
   resetScore: protectedProcedure
-    .input(z.object({ id: z.string(), tournamentId: z.string() }))
+    .input(z.object({
+      id: z.string(),
+      tournamentId: z.string(),
+      confirmCascade: z.boolean().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      return ctx.prisma.game.update({
+      const game = await ctx.prisma.game.findUnique({
         where: { id: input.id },
-        data: {
-          scoreTeam1: null,
-          scoreTeam2: null,
-          setScores: Prisma.DbNull,
-          status: "SCHEDULED",
+        include: { round: true },
+      });
+      if (!game) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const isBracket = game.round.type === "SINGLE_ELIM" || game.round.type === "DOUBLE_ELIM";
+
+      if (isBracket) {
+        const allGames = await ctx.prisma.game.findMany({
+          where: { roundId: game.roundId },
+          select: {
+            id: true, team1Id: true, team2Id: true,
+            status: true, scoreTeam1: true, scoreTeam2: true,
+            feederGame1Id: true, feederGame2Id: true,
+          },
+        });
+
+        const clearActions = getGamesToClear(input.id, allGames);
+        const scoredDownstream = clearActions.filter((a) => a.clearScores);
+
+        if (scoredDownstream.length > 0 && !input.confirmCascade) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: JSON.stringify({
+              type: "CASCADE_REQUIRED",
+              downstreamCount: clearActions.length,
+              scoredCount: scoredDownstream.length,
+            }),
+          });
+        }
+
+        await ctx.prisma.$transaction(async (tx) => {
+          // Reset the edited game
+          await tx.game.update({
+            where: { id: input.id },
+            data: {
+              scoreTeam1: null,
+              scoreTeam2: null,
+              setScores: Prisma.DbNull,
+              status: "SCHEDULED",
+            },
+          });
+
+          // Clear downstream team slots and scores
+          for (const action of clearActions) {
+            const clearData: Record<string, unknown> = {};
+            if (action.clearTeam1) clearData.team1Id = null;
+            if (action.clearTeam2) clearData.team2Id = null;
+            if (action.clearScores) {
+              clearData.scoreTeam1 = null;
+              clearData.scoreTeam2 = null;
+              clearData.setScores = Prisma.DbNull;
+              clearData.status = "SCHEDULED";
+            }
+            await tx.game.update({ where: { id: action.gameId }, data: clearData });
+          }
+        });
+      } else {
+        await ctx.prisma.game.update({
+          where: { id: input.id },
+          data: {
+            scoreTeam1: null,
+            scoreTeam2: null,
+            setScores: Prisma.DbNull,
+            status: "SCHEDULED",
+          },
+        });
+      }
+
+      emitToTournament(input.tournamentId, "score:updated", {
+        gameId: input.id,
+        roundId: game.roundId,
+        poolId: game.poolId,
+        scoreTeam1: null,
+        scoreTeam2: null,
+        status: "SCHEDULED",
+      }).catch(() => {});
+
+      return ctx.prisma.game.findUnique({ where: { id: input.id } });
+    }),
+
+  autoSchedule: protectedProcedure
+    .input(
+      z.object({
+        tournamentId: z.string(),
+        config: z.object({
+          gameDurationMinutes: z.number().int().min(5).max(300),
+          breakBetweenMinutes: z.number().int().min(0).max(120),
+          dayStartHour: z.number().min(0).max(23),
+          dayEndHour: z.number().min(1).max(24),
+        }),
+        clearExisting: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tournament = await verifyTournamentOwnership(
+        ctx.prisma, input.tournamentId, ctx.userId
+      );
+
+      // Validate tournament has dates
+      if (!tournament.startDate || !tournament.endDate) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Tournament must have start and end dates for auto-scheduling",
+        });
+      }
+
+      // Fetch courts (locations)
+      const locations = await ctx.prisma.location.findMany({
+        where: { tournamentId: input.tournamentId },
+      });
+      if (locations.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Tournament must have at least one court/location",
+        });
+      }
+
+      // Fetch all games
+      const allGames = await ctx.prisma.game.findMany({
+        where: { round: { tournamentId: input.tournamentId } },
+        select: {
+          id: true, team1Id: true, team2Id: true,
+          status: true, feederGame1Id: true, feederGame2Id: true,
         },
       });
+      if (allGames.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No games to schedule. Generate games first.",
+        });
+      }
+
+      // Build days from tournament date range
+      const days = [];
+      const start = new Date(tournament.startDate);
+      const end = new Date(tournament.endDate);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        days.push({
+          date: d.toISOString().split("T")[0],
+          startHour: input.config.dayStartHour,
+          endHour: input.config.dayEndHour,
+        });
+      }
+
+      const result = generateSchedule(
+        allGames.map((g) => ({
+          id: g.id,
+          team1Id: g.team1Id,
+          team2Id: g.team2Id,
+          status: g.status,
+          feederGame1Id: g.feederGame1Id,
+          feederGame2Id: g.feederGame2Id,
+        })),
+        {
+          gameDurationMinutes: input.config.gameDurationMinutes,
+          breakBetweenMinutes: input.config.breakBetweenMinutes,
+          days,
+          courts: locations.map((l) => ({ id: l.id, name: l.name })),
+        }
+      );
+
+      if (!result.success) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: result.error,
+        });
+      }
+
+      // Optionally clear existing schedule
+      if (input.clearExisting) {
+        await ctx.prisma.game.updateMany({
+          where: { round: { tournamentId: input.tournamentId } },
+          data: { scheduledAt: null, locationId: null },
+        });
+      }
+
+      // Batch-update games with assignments
+      await Promise.all(
+        result.assignments.map((a) =>
+          ctx.prisma.game.update({
+            where: { id: a.gameId },
+            data: {
+              scheduledAt: new Date(a.scheduledAt),
+              locationId: a.locationId,
+              durationMinutes: a.durationMinutes,
+            },
+          })
+        )
+      );
+
+      emitToTournament(input.tournamentId, "schedule:updated", {
+        batchUpdate: true,
+        count: result.assignments.length,
+      }).catch(() => {});
+
+      return { scheduled: result.assignments.length };
     }),
 
   getBracketData: protectedProcedure
