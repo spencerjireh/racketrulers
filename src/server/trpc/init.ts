@@ -15,6 +15,19 @@ export const createTRPCContext = cache(async () => {
 
 const t = initTRPC.context<Awaited<ReturnType<typeof createTRPCContext>>>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    const cause = error.cause as Record<string, unknown> | undefined;
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        cause:
+          cause && typeof cause === "object" && "type" in cause
+            ? { type: cause.type, downstreamCount: cause.downstreamCount, scoredCount: cause.scoredCount }
+            : undefined,
+      },
+    };
+  },
 });
 
 export const createCallerFactory = t.createCallerFactory;

@@ -15,16 +15,11 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-interface ScheduleConfig {
-  slotDuration: number;
-  dayStartHour: number;
-  dayEndHour: number;
-}
+import { DEFAULT_SCHEDULE_CONFIG, type ScheduleConfig } from "@/lib/constants";
 
 interface GameItem {
   id: string;
@@ -42,12 +37,6 @@ interface LocalAssignment {
   scheduledAt: string;
   locationId: string;
 }
-
-const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
-  slotDuration: 30,
-  dayStartHour: 8,
-  dayEndHour: 20,
-};
 
 export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
   const trpc = useTRPC();
@@ -88,20 +77,6 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
 
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
-  // Time slots for the grid
-  const timeSlots = useMemo(() => {
-    const slots: string[] = [];
-    for (let h = scheduleConfig.dayStartHour; h < scheduleConfig.dayEndHour; h++) {
-      for (let m = 0; m < 60; m += scheduleConfig.slotDuration) {
-        const hour = h % 12 || 12;
-        const ampm = h < 12 ? "AM" : "PM";
-        const mins = m.toString().padStart(2, "0");
-        slots.push(`${hour}:${mins} ${ampm}`);
-      }
-    }
-    return slots;
-  }, [scheduleConfig]);
-
   // Get effective game data (merging local changes)
   const getEffectiveGame = useCallback(
     (game: GameItem) => {
@@ -117,6 +92,47 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
     [localChanges]
   );
 
+  // Pre-compute game lookup by cell key for O(1) access per cell
+  const gameByCellKey = useMemo(() => {
+    if (!allGames || tournamentDays.length === 0) return new Map<string, ReturnType<typeof getEffectiveGame>>();
+    const day = tournamentDays[selectedDayIndex];
+    if (!day) return new Map<string, ReturnType<typeof getEffectiveGame>>();
+
+    const dayStart = new Date(day);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const map = new Map<string, ReturnType<typeof getEffectiveGame>>();
+    for (const game of allGames) {
+      const g = getEffectiveGame(game);
+      if (!g.effectiveScheduledAt || !g.effectiveLocationId) continue;
+      const d = new Date(g.effectiveScheduledAt);
+      if (d < dayStart || d > dayEnd) continue;
+      const totalMin = d.getHours() * 60 + d.getMinutes();
+      const slotIndex = Math.floor(
+        (totalMin - scheduleConfig.dayStartHour * 60) / scheduleConfig.slotDuration
+      );
+      const key = `${g.effectiveLocationId}-${slotIndex}`;
+      map.set(key, g);
+    }
+    return map;
+  }, [allGames, tournamentDays, selectedDayIndex, getEffectiveGame, scheduleConfig]);
+
+  // Time slots for the grid
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let h = scheduleConfig.dayStartHour; h < scheduleConfig.dayEndHour; h++) {
+      for (let m = 0; m < 60; m += scheduleConfig.slotDuration) {
+        const hour = h % 12 || 12;
+        const ampm = h < 12 ? "AM" : "PM";
+        const mins = m.toString().padStart(2, "0");
+        slots.push(`${hour}:${mins} ${ampm}`);
+      }
+    }
+    return slots;
+  }, [scheduleConfig]);
+
   // Unscheduled games (no scheduledAt and no local assignment)
   const unscheduledGames = useMemo(() => {
     if (!allGames) return [];
@@ -125,26 +141,6 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
       return !local && !g.scheduledAt;
     });
   }, [allGames, localChanges]);
-
-  // Games on the grid for the selected day
-  const scheduledGamesForDay = useMemo(() => {
-    if (!allGames || tournamentDays.length === 0) return [];
-    const day = tournamentDays[selectedDayIndex];
-    if (!day) return [];
-    const dayStart = new Date(day);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(day);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    return allGames
-      .map(getEffectiveGame)
-      .filter((g) => {
-        const at = g.effectiveScheduledAt;
-        if (!at) return false;
-        const d = new Date(at);
-        return d >= dayStart && d <= dayEnd;
-      });
-  }, [allGames, tournamentDays, selectedDayIndex, getEffectiveGame]);
 
   // DnD
   const sensors = useSensors(
@@ -340,16 +336,7 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
                   </div>
                   {locations.map((loc) => {
                     const cellId = `slot-${slotIndex}-${loc.id}`;
-                    // Find game in this cell
-                    const gameInCell = scheduledGamesForDay.find((g) => {
-                      if (g.effectiveLocationId !== loc.id) return false;
-                      const at = new Date(g.effectiveScheduledAt!);
-                      const totalMin = at.getHours() * 60 + at.getMinutes();
-                      const slotMin =
-                        scheduleConfig.dayStartHour * 60 +
-                        slotIndex * scheduleConfig.slotDuration;
-                      return totalMin === slotMin;
-                    });
+                    const gameInCell = gameByCellKey.get(`${loc.id}-${slotIndex}`);
 
                     return (
                       <DroppableCell

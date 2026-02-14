@@ -45,9 +45,9 @@ export function AutoScheduleDialog({
   const autoSchedule = useMutation(
     trpc.games.autoSchedule.mutationOptions({
       onSuccess: (data) => {
-        queryClient.invalidateQueries({
-          queryKey: [["games"]],
-        });
+        queryClient.invalidateQueries(
+          trpc.games.listByTournament.queryFilter({ tournamentId })
+        );
         toast.success(`Scheduled ${data.scheduled} games`);
         onOpenChange(false);
       },

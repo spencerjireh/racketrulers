@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { baseProcedure, protectedProcedure, createTRPCRouter } from "../init";
+import { stripUndefined } from "@/lib/utils";
 
 export const coachRouter = createTRPCRouter({
   getProfile: protectedProcedure.query(async ({ ctx }) => {
@@ -84,11 +85,11 @@ export const coachRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "No coach profile found" });
       }
 
-      const updateData: Record<string, unknown> = {};
-      if (input.displayName !== undefined) updateData.displayName = input.displayName;
-      if (input.sessionDurationMinutes !== undefined)
-        updateData.sessionDurationMinutes = input.sessionDurationMinutes;
-      if (input.timezone !== undefined) updateData.timezone = input.timezone;
+      const updateData = stripUndefined({
+        displayName: input.displayName,
+        sessionDurationMinutes: input.sessionDurationMinutes,
+        timezone: input.timezone,
+      });
 
       return ctx.prisma.coachProfile.update({
         where: { id: profile.id },

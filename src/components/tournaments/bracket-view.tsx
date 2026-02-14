@@ -17,18 +17,7 @@ import {
   COL_GAP,
   ROW_GAP,
 } from "@/lib/bracket-layout";
-
-interface ScoringConfig {
-  pointsPerSet: number;
-  totalSets: number;
-  deuceEnabled: boolean;
-  maxPoints: number;
-}
-
-interface SetScore {
-  team1: number;
-  team2: number;
-}
+import { type ScoringConfig, type SetScore, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
 
 interface BracketViewProps {
   tournamentId: string;
@@ -36,13 +25,6 @@ interface BracketViewProps {
   interactive?: boolean;
   scoringConfig?: ScoringConfig;
 }
-
-const DEFAULT_SCORING_CONFIG: ScoringConfig = {
-  pointsPerSet: 21,
-  totalSets: 3,
-  deuceEnabled: true,
-  maxPoints: 30,
-};
 
 const ZOOM_LEVELS = [0.5, 0.75, 1.0];
 
@@ -64,7 +46,6 @@ export function BracketView({
   const lastSubmittedScores = useRef<{ team1: number; team2: number }[]>([]);
   const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
 
-  const queryKey = interactive ? "getBracketData" : "getBracketDataPublic";
   const queryOptions = interactive
     ? trpc.games.getBracketData.queryOptions({ roundId, tournamentId })
     : trpc.games.getBracketDataPublic.queryOptions({ roundId, tournamentId });
@@ -99,13 +80,17 @@ export function BracketView({
   }, [rounds]);
 
   const invalidateBracket = () => {
-    queryClient.invalidateQueries({ queryKey: [["games", queryKey]] });
-    queryClient.invalidateQueries({
-      queryKey: [["games", "listByRound"]],
-    });
-    queryClient.invalidateQueries({
-      queryKey: [["games", "getStandings"]],
-    });
+    queryClient.invalidateQueries(
+      interactive
+        ? trpc.games.getBracketData.queryFilter({ roundId, tournamentId })
+        : trpc.games.getBracketDataPublic.queryFilter({ roundId, tournamentId })
+    );
+    queryClient.invalidateQueries(
+      trpc.games.listByRound.queryFilter({ roundId, tournamentId })
+    );
+    queryClient.invalidateQueries(
+      trpc.games.getStandings.queryFilter({ roundId })
+    );
   };
 
   const updateScore = useMutation(
@@ -117,18 +102,14 @@ export function BracketView({
         toast.success("Score saved");
       },
       onError: (err) => {
-        try {
-          const parsed = JSON.parse(err.message);
-          if (parsed.type === "CASCADE_REQUIRED" && scoringGame) {
-            setCascadeInfo({
-              downstreamCount: parsed.downstreamCount,
-              scoredCount: parsed.scoredCount,
-              gameId: scoringGame.id,
-            });
-            return;
-          }
-        } catch {
-          // Not a cascade error
+        const cause = (err as { data?: { cause?: { type?: string; downstreamCount?: number; scoredCount?: number } } }).data?.cause;
+        if (cause?.type === "CASCADE_REQUIRED" && scoringGame) {
+          setCascadeInfo({
+            downstreamCount: cause.downstreamCount ?? 0,
+            scoredCount: cause.scoredCount ?? 0,
+            gameId: scoringGame.id,
+          });
+          return;
         }
         toast.error(err.message);
       },

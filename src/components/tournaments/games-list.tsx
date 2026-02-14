@@ -17,18 +17,7 @@ import { toast } from "sonner";
 import { GameStatusBadge } from "./game-status-badge";
 import { ScoreEntryDialog } from "./score-entry-dialog";
 import { CascadeWarningDialog } from "./cascade-warning-dialog";
-
-interface SetScore {
-  team1: number;
-  team2: number;
-}
-
-interface ScoringConfig {
-  pointsPerSet: number;
-  totalSets: number;
-  deuceEnabled: boolean;
-  maxPoints: number;
-}
+import { type SetScore, type ScoringConfig, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
 
 interface Game {
   id: string;
@@ -51,13 +40,6 @@ interface GamesListProps {
   showPool?: boolean;
   scoringConfig?: ScoringConfig;
 }
-
-const DEFAULT_SCORING_CONFIG: ScoringConfig = {
-  pointsPerSet: 21,
-  totalSets: 3,
-  deuceEnabled: true,
-  maxPoints: 30,
-};
 
 function formatSetScores(setScores: SetScore[] | null | undefined): string {
   if (!setScores || setScores.length === 0) return "";
@@ -88,12 +70,12 @@ export function GamesList({
     queryClient.invalidateQueries(
       trpc.games.listByTournament.queryFilter({ tournamentId })
     );
-    queryClient.invalidateQueries({
-      queryKey: [["games", "listByRound"]],
-    });
-    queryClient.invalidateQueries({
-      queryKey: [["games", "getStandings"]],
-    });
+    queryClient.invalidateQueries(
+      trpc.games.listByRound.queryFilter()
+    );
+    queryClient.invalidateQueries(
+      trpc.games.getStandings.queryFilter()
+    );
   };
 
   const updateScore = useMutation(
@@ -105,20 +87,16 @@ export function GamesList({
         toast.success("Score saved");
       },
       onError: (err) => {
-        try {
-          const parsed = JSON.parse(err.message);
-          if (parsed.type === "CASCADE_REQUIRED" && scoringGame) {
-            setCascadeInfo({
-              downstreamCount: parsed.downstreamCount,
-              scoredCount: parsed.scoredCount,
-              pendingSetScores: lastSubmittedScores.current,
-              gameId: scoringGame.id,
-              type: "score",
-            });
-            return;
-          }
-        } catch {
-          // Not a cascade error
+        const cause = (err as { data?: { cause?: { type?: string; downstreamCount?: number; scoredCount?: number } } }).data?.cause;
+        if (cause?.type === "CASCADE_REQUIRED" && scoringGame) {
+          setCascadeInfo({
+            downstreamCount: cause.downstreamCount ?? 0,
+            scoredCount: cause.scoredCount ?? 0,
+            pendingSetScores: lastSubmittedScores.current,
+            gameId: scoringGame.id,
+            type: "score",
+          });
+          return;
         }
         toast.error(err.message);
       },
@@ -145,20 +123,16 @@ export function GamesList({
         toast.success("Score reset");
       },
       onError: (err) => {
-        try {
-          const parsed = JSON.parse(err.message);
-          if (parsed.type === "CASCADE_REQUIRED" && pendingResetGameId) {
-            setCascadeInfo({
-              downstreamCount: parsed.downstreamCount,
-              scoredCount: parsed.scoredCount,
-              pendingSetScores: [],
-              gameId: pendingResetGameId,
-              type: "reset",
-            });
-            return;
-          }
-        } catch {
-          // Not a cascade error
+        const cause = (err as { data?: { cause?: { type?: string; downstreamCount?: number; scoredCount?: number } } }).data?.cause;
+        if (cause?.type === "CASCADE_REQUIRED" && pendingResetGameId) {
+          setCascadeInfo({
+            downstreamCount: cause.downstreamCount ?? 0,
+            scoredCount: cause.scoredCount ?? 0,
+            pendingSetScores: [],
+            gameId: pendingResetGameId,
+            type: "reset",
+          });
+          return;
         }
         setPendingResetGameId(null);
         toast.error(err.message);

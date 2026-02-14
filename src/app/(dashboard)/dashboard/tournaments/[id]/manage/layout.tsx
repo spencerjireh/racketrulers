@@ -1,14 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerCaller } from "@/lib/trpc/server";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
-import { cn } from "@/lib/utils";
-
-const TABS = [
-  { label: "Settings", segment: "settings" },
-  { label: "Participants", segment: "participants" },
-  { label: "Bracket", segment: "bracket" },
-] as const;
+import { ManageTabs } from "@/components/dashboard/manage-tabs";
 
 export default async function ManageTournamentLayout({
   children,
@@ -49,21 +42,7 @@ export default async function ManageTournamentLayout({
           {statusLabel}
         </Badge>
       </div>
-      <nav className="flex gap-1 border-b">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.segment}
-            href={`/dashboard/tournaments/${id}/manage/${tab.segment}`}
-            className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 border-transparent",
-              "hover:text-foreground hover:border-muted-foreground/30",
-              "transition-colors -mb-px"
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
+      <ManageTabs tournamentId={id} />
       {children}
     </div>
   );

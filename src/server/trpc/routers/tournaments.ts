@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { baseProcedure, protectedProcedure, createTRPCRouter } from "../init";
 import { generateUniqueSlug } from "@/lib/slug";
 import { verifyTournamentOwnership } from "../helpers";
+import { stripUndefined } from "@/lib/utils";
 
 export const tournamentsRouter = createTRPCRouter({
   getStats: protectedProcedure.query(async ({ ctx }) => {
@@ -189,19 +190,19 @@ export const tournamentsRouter = createTRPCRouter({
       }
 
       const { id, ...data } = input;
-      const updateData: Record<string, unknown> = {};
-
-      if (data.name !== undefined) updateData.name = data.name;
-      if (data.description !== undefined) updateData.description = data.description;
-      if (data.format !== undefined) updateData.format = data.format;
-      if (data.drawsAllowed !== undefined) updateData.drawsAllowed = data.drawsAllowed;
-      if (data.timezone !== undefined) updateData.timezone = data.timezone;
-      if (data.pointsConfig !== undefined) updateData.pointsConfig = data.pointsConfig;
-      if (data.scoringConfig !== undefined) updateData.scoringConfig = data.scoringConfig;
-      if (data.scheduleConfig !== undefined) updateData.scheduleConfig = data.scheduleConfig;
-      if (data.tiebreakerConfig !== undefined) updateData.tiebreakerConfig = data.tiebreakerConfig;
-      if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
-      if (data.endDate !== undefined) updateData.endDate = new Date(data.endDate);
+      const updateData = stripUndefined({
+        name: data.name,
+        description: data.description,
+        format: data.format,
+        drawsAllowed: data.drawsAllowed,
+        timezone: data.timezone,
+        pointsConfig: data.pointsConfig,
+        scoringConfig: data.scoringConfig,
+        scheduleConfig: data.scheduleConfig,
+        tiebreakerConfig: data.tiebreakerConfig,
+        startDate: data.startDate !== undefined ? new Date(data.startDate) : undefined,
+        endDate: data.endDate !== undefined ? new Date(data.endDate) : undefined,
+      });
 
       return ctx.prisma.tournament.update({
         where: { id },

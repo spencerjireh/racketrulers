@@ -82,7 +82,7 @@ export function CoachDashboard() {
             <CollapsibleContent>
               <Separator />
               <CardContent className="pt-6">
-                {id === "profile" && <ProfileSettings profile={profile} />}
+                {id === "profile" && <ProfileSettings key={profile.slug} profile={profile} />}
                 {id === "availability" && (
                   <AvailabilityEditor
                     initialSlots={profile.availability.map((a) => ({

@@ -51,6 +51,12 @@ export const poolsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+
+      const pool = await ctx.prisma.pool.findFirst({
+        where: { id: input.id, round: { tournamentId: input.tournamentId } },
+      });
+      if (!pool) throw new TRPCError({ code: "NOT_FOUND" });
+
       return ctx.prisma.pool.delete({ where: { id: input.id } });
     }),
 
@@ -135,42 +141,44 @@ export const poolsRouter = createTRPCRouter({
         });
       }
 
-      // Delete existing pools for this round
-      await ctx.prisma.pool.deleteMany({ where: { roundId: input.roundId } });
+      return ctx.prisma.$transaction(async (tx) => {
+        // Delete existing pools for this round
+        await tx.pool.deleteMany({ where: { roundId: input.roundId } });
 
-      // Create pools
-      const pools = [];
-      for (let i = 0; i < input.poolCount; i++) {
-        const pool = await ctx.prisma.pool.create({
-          data: {
-            name: `Pool ${String.fromCharCode(65 + i)}`,
-            roundId: input.roundId,
-          },
-        });
-        pools.push(pool);
-      }
-
-      // Snake draft assignment
-      const assignments: { poolId: string; teamId: string; seed: number }[] = [];
-      let poolIndex = 0;
-      let direction = 1;
-
-      for (let i = 0; i < teams.length; i++) {
-        assignments.push({
-          poolId: pools[poolIndex].id,
-          teamId: teams[i].id,
-          seed: Math.floor(i / input.poolCount) + 1,
-        });
-
-        poolIndex += direction;
-        if (poolIndex >= input.poolCount || poolIndex < 0) {
-          direction *= -1;
-          poolIndex += direction;
+        // Create pools
+        const pools = [];
+        for (let i = 0; i < input.poolCount; i++) {
+          const pool = await tx.pool.create({
+            data: {
+              name: `Pool ${String.fromCharCode(65 + i)}`,
+              roundId: input.roundId,
+            },
+          });
+          pools.push(pool);
         }
-      }
 
-      await ctx.prisma.poolTeam.createMany({ data: assignments });
+        // Snake draft assignment
+        const assignments: { poolId: string; teamId: string; seed: number }[] = [];
+        let poolIndex = 0;
+        let direction = 1;
 
-      return { poolsCreated: pools.length, teamsAssigned: assignments.length };
+        for (let i = 0; i < teams.length; i++) {
+          assignments.push({
+            poolId: pools[poolIndex].id,
+            teamId: teams[i].id,
+            seed: Math.floor(i / input.poolCount) + 1,
+          });
+
+          poolIndex += direction;
+          if (poolIndex >= input.poolCount || poolIndex < 0) {
+            direction *= -1;
+            poolIndex += direction;
+          }
+        }
+
+        await tx.poolTeam.createMany({ data: assignments });
+
+        return { poolsCreated: pools.length, teamsAssigned: assignments.length };
+      });
     }),
 });

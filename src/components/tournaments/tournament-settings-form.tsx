@@ -16,60 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-
-const TIMEZONES = [
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Toronto",
-  "America/Vancouver",
-  "America/Mexico_City",
-  "America/Sao_Paulo",
-  "America/Argentina/Buenos_Aires",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Europe/Madrid",
-  "Europe/Rome",
-  "Europe/Moscow",
-  "Asia/Dubai",
-  "Asia/Kolkata",
-  "Asia/Bangkok",
-  "Asia/Singapore",
-  "Asia/Manila",
-  "Asia/Shanghai",
-  "Asia/Tokyo",
-  "Asia/Seoul",
-  "Australia/Sydney",
-  "Pacific/Auckland",
-];
-
-interface ScoringConfig {
-  pointsPerSet: number;
-  totalSets: number;
-  deuceEnabled: boolean;
-  maxPoints: number;
-}
-
-const DEFAULT_SCORING_CONFIG: ScoringConfig = {
-  pointsPerSet: 21,
-  totalSets: 3,
-  deuceEnabled: true,
-  maxPoints: 30,
-};
-
-interface ScheduleConfig {
-  slotDuration: number;
-  dayStartHour: number;
-  dayEndHour: number;
-}
-
-const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
-  slotDuration: 30,
-  dayStartHour: 8,
-  dayEndHour: 20,
-};
+import { TIMEZONES, DEFAULT_SCHEDULE_CONFIG, type ScheduleConfig } from "@/lib/constants";
+import { type ScoringConfig, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
 
 type TournamentFormat = "ROUND_ROBIN" | "SINGLE_ELIM" | "DOUBLE_ELIM" | "SWISS" | "CUSTOM";
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, createTRPCRouter } from "../init";
 import { verifyTournamentOwnership } from "../helpers";
+import { fisherYatesShuffle, stripUndefined } from "@/lib/utils";
 
 export const teamsRouter = createTRPCRouter({
   list: protectedProcedure
@@ -101,15 +102,15 @@ export const teamsRouter = createTRPCRouter({
         }
       }
 
-      const { id, tournamentId, ...data } = input;
-      const updateData: Record<string, unknown> = {};
-      if (data.name !== undefined) updateData.name = data.name;
-      if (data.captainName !== undefined) updateData.captainName = data.captainName || null;
-      if (data.captainEmail !== undefined) updateData.captainEmail = data.captainEmail || null;
-      if (data.roster !== undefined) updateData.roster = data.roster;
+      const updateData = stripUndefined({
+        name: input.name,
+        captainName: input.captainName !== undefined ? (input.captainName || null) : undefined,
+        captainEmail: input.captainEmail !== undefined ? (input.captainEmail || null) : undefined,
+        roster: input.roster,
+      });
 
       return ctx.prisma.team.update({
-        where: { id },
+        where: { id: input.id },
         data: updateData,
       });
     }),
@@ -131,6 +132,11 @@ export const teamsRouter = createTRPCRouter({
           message: "Cannot delete team with active games",
         });
       }
+
+      const team = await ctx.prisma.team.findFirst({
+        where: { id: input.id, tournamentId: input.tournamentId },
+      });
+      if (!team) throw new TRPCError({ code: "NOT_FOUND" });
 
       return ctx.prisma.team.delete({ where: { id: input.id } });
     }),
@@ -209,7 +215,7 @@ export const teamsRouter = createTRPCRouter({
         where: { tournamentId: input.tournamentId },
       });
 
-      const shuffled = [...teams].sort(() => Math.random() - 0.5);
+      const shuffled = fisherYatesShuffle([...teams]);
 
       await ctx.prisma.$transaction(
         shuffled.map((t, index) =>

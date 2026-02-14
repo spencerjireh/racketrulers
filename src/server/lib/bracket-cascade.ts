@@ -104,8 +104,6 @@ export function getGamesToClear(
 ): GameClearAction[] {
   // Build forward adjacency
   const fedBy = new Map<string, CascadeGameInput[]>();
-  const gameMap = new Map(allGames.map((g) => [g.id, g]));
-
   for (const g of allGames) {
     if (g.feederGame1Id) {
       if (!fedBy.has(g.feederGame1Id)) fedBy.set(g.feederGame1Id, []);

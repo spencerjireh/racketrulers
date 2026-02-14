@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,23 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-
-const TIMEZONES = [
-  "Asia/Manila",
-  "Asia/Singapore",
-  "Asia/Kolkata",
-  "Asia/Tokyo",
-  "Pacific/Auckland",
-  "Australia/Sydney",
-  "America/Toronto",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Vancouver",
-  "Europe/London",
-  "Europe/Paris",
-];
+import { TIMEZONES } from "@/lib/constants";
 
 const DURATION_PRESETS = [30, 45, 60, 90, 120];
 
@@ -54,16 +38,6 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
   const [customDuration, setCustomDuration] = useState(
     !DURATION_PRESETS.includes(profile.sessionDurationMinutes)
   );
-
-  useEffect(() => {
-    setDisplayName(profile.displayName);
-    setDuration(profile.sessionDurationMinutes);
-    setTimezone(profile.timezone);
-  }, [profile]);
-
-  useEffect(() => {
-    setCustomDuration(!DURATION_PRESETS.includes(profile.sessionDurationMinutes));
-  }, [profile.sessionDurationMinutes]);
 
   const updateProfile = useMutation(
     trpc.coach.updateProfile.mutationOptions({

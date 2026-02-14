@@ -126,7 +126,7 @@ export function BookingsList() {
                           setCancelTarget({
                             id: booking.id,
                             name: booking.bookerName,
-                            date: booking.date as unknown as string,
+                            date: new Date(booking.date).toISOString().split("T")[0],
                             time: booking.startTime,
                           })
                         }

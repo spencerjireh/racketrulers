@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import type { Prisma } from "@prisma/client";
 import { protectedProcedure, createTRPCRouter } from "../init";
 import { verifyTournamentOwnership } from "../helpers";
+import { stripUndefined } from "@/lib/utils";
 import {
   generateRoundRobinGames,
   generateSingleElimGames,
@@ -93,19 +94,24 @@ export const roundsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const { id, tournamentId, ...data } = input;
-      const updateData: Record<string, unknown> = {};
-      if (data.name !== undefined) updateData.name = data.name;
-      if (data.drawsAllowed !== undefined) updateData.drawsAllowed = data.drawsAllowed;
-      if (data.config !== undefined) updateData.config = data.config;
+      const updateData = stripUndefined({
+        name: input.name,
+        drawsAllowed: input.drawsAllowed,
+        config: input.config,
+      });
 
-      return ctx.prisma.round.update({ where: { id }, data: updateData });
+      return ctx.prisma.round.update({ where: { id: input.id }, data: updateData as Prisma.RoundUpdateInput });
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+
+      const round = await ctx.prisma.round.findFirst({
+        where: { id: input.id, tournamentId: input.tournamentId },
+      });
+      if (!round) throw new TRPCError({ code: "NOT_FOUND" });
 
       const inProgress = await ctx.prisma.game.count({
         where: { roundId: input.id, status: "IN_PROGRESS" },
@@ -203,53 +209,42 @@ export const roundsRouter = createTRPCRouter({
           (round.config as Record<string, unknown>)?.consolation_match === true;
         const gameSeeds = generateSingleElimGames(teamIds, consolation);
 
-        // Pass 1: Create all games without feeder links
-        const createdIds: string[] = [];
-        for (const g of gameSeeds) {
-          const created = await ctx.prisma.game.create({
-            data: {
-              team1Id: g.team1Id,
-              team2Id: g.team2Id,
-              roundPosition: g.roundPosition,
-              roundId: round.id,
-              status: "SCHEDULED",
-            },
-          });
-          createdIds.push(created.id);
-        }
+        const createdIds = await ctx.prisma.$transaction(async (tx) => {
+          // Pass 1: Create all games without feeder links
+          const ids: string[] = [];
+          for (const g of gameSeeds) {
+            const created = await tx.game.create({
+              data: {
+                team1Id: g.team1Id,
+                team2Id: g.team2Id,
+                roundPosition: g.roundPosition,
+                roundId: round.id,
+                status: "SCHEDULED",
+              },
+            });
+            ids.push(created.id);
+          }
 
-        // Pass 2: Link feeder games using positional indices
-        const feederUpdates = gameSeeds
-          .map((g, i) => ({ seed: g, dbId: createdIds[i] }))
-          .filter(({ seed }) => seed.feederIndex1 != null || seed.feederIndex2 != null);
-
-        if (feederUpdates.length > 0) {
-          await Promise.all(
-            feederUpdates.map(({ seed, dbId }) =>
-              ctx.prisma.game.update({
-                where: { id: dbId },
+          // Pass 2: Link feeder games using positional indices
+          for (let i = 0; i < gameSeeds.length; i++) {
+            const seed = gameSeeds[i];
+            if (seed.feederIndex1 != null || seed.feederIndex2 != null) {
+              await tx.game.update({
+                where: { id: ids[i] },
                 data: {
-                  feederGame1Id: seed.feederIndex1 != null ? createdIds[seed.feederIndex1] : undefined,
-                  feederGame2Id: seed.feederIndex2 != null ? createdIds[seed.feederIndex2] : undefined,
+                  feederGame1Id: seed.feederIndex1 != null ? ids[seed.feederIndex1] : undefined,
+                  feederGame2Id: seed.feederIndex2 != null ? ids[seed.feederIndex2] : undefined,
                 },
-              })
-            )
-          );
-        }
+              });
+            }
+          }
 
-        // Pass 3: Auto-complete bye games (exactly one team is null)
-        const byeGames = gameSeeds
-          .map((g, i) => ({ seed: g, dbId: createdIds[i] }))
-          .filter(
-            ({ seed }) =>
-              (seed.team1Id === null) !== (seed.team2Id === null)
-          );
-
-        if (byeGames.length > 0) {
-          await Promise.all(
-            byeGames.map(({ seed, dbId }) => {
-              return ctx.prisma.game.update({
-                where: { id: dbId },
+          // Pass 3: Auto-complete bye games (exactly one team is null)
+          for (let i = 0; i < gameSeeds.length; i++) {
+            const seed = gameSeeds[i];
+            if ((seed.team1Id === null) !== (seed.team2Id === null)) {
+              await tx.game.update({
+                where: { id: ids[i] },
                 data: {
                   status: "COMPLETED",
                   scoreTeam1: seed.team1Id ? 1 : 0,
@@ -257,9 +252,11 @@ export const roundsRouter = createTRPCRouter({
                   setScores: [{ team1: seed.team1Id ? 21 : 0, team2: seed.team2Id ? 21 : 0 }],
                 },
               });
-            })
-          );
-        }
+            }
+          }
+
+          return ids;
+        });
 
         return { gamesCreated: createdIds.length };
       }

@@ -1,7 +1,23 @@
+import type { Metadata } from "next";
 import { createServerCaller } from "@/lib/trpc/server";
 import { TournamentHeader } from "@/components/public/tournament-header";
 import { TournamentNav } from "@/components/public/tournament-nav";
 import { RealtimeWrapper } from "@/components/public/realtime-wrapper";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const caller = await createServerCaller();
+  try {
+    const tournament = await caller.tournaments.getBySlug({ slug });
+    return { title: tournament.name };
+  } catch {
+    return { title: "Tournament" };
+  }
+}
 
 export default async function PublicTournamentLayout({
   children,

@@ -1,3 +1,5 @@
+import { fisherYatesShuffle } from "@/lib/utils";
+
 interface GameSeed {
   team1Id: string | null;
   team2Id: string | null;
@@ -314,7 +316,7 @@ export function generateSwissPairings(
 
   if (!previousResults || previousResults.length === 0) {
     // Round 1: random pairings
-    const shuffled = [...teamIds].sort(() => Math.random() - 0.5);
+    const shuffled = fisherYatesShuffle([...teamIds]);
     for (let i = 0; i < shuffled.length - 1; i += 2) {
       games.push({
         team1Id: shuffled[i],
@@ -357,35 +359,40 @@ function nextPowerOf2(n: number): number {
 }
 
 /**
- * Creates standard seeded matchups for a bracket.
- * 1 vs N, 2 vs N-1, etc. with proper bracket placement.
+ * Creates standard seeded matchups for a bracket with proper placement.
+ * Seed 1 and 2 are on opposite sides; 1-4 only meet in semis, etc.
+ * Uses recursive complement insertion to build the bracket order.
  */
 function createSeededMatchups(bracketSize: number): [number, number][] {
   if (bracketSize === 2) return [[1, 2]];
 
+  // Build the seed order recursively
+  const order = buildBracketOrder(bracketSize);
+
   const matchups: [number, number][] = [];
-  const half = bracketSize / 2;
-
-  for (let i = 0; i < half; i++) {
-    matchups.push([i + 1, bracketSize - i]);
+  for (let i = 0; i < order.length; i += 2) {
+    matchups.push([order[i], order[i + 1]]);
   }
-
-  // Reorder for proper bracket structure
-  return reorderForBracket(matchups);
+  return matchups;
 }
 
-function reorderForBracket(matchups: [number, number][]): [number, number][] {
-  if (matchups.length <= 1) return matchups;
+/**
+ * Recursively builds the bracket seed order.
+ * Start with [1, 2], then for each doubling, pair each seed s with (size + 1 - s),
+ * interleaving so that complements are placed in adjacent positions.
+ */
+function buildBracketOrder(bracketSize: number): number[] {
+  let seeds = [1, 2];
 
-  const result: [number, number][] = [];
-  const n = matchups.length;
-
-  for (let i = 0; i < n; i += 2) {
-    result.push(matchups[i]);
+  while (seeds.length < bracketSize) {
+    const nextSize = seeds.length * 2;
+    const nextSeeds: number[] = [];
+    for (const seed of seeds) {
+      nextSeeds.push(seed);
+      nextSeeds.push(nextSize + 1 - seed);
+    }
+    seeds = nextSeeds;
   }
-  for (let i = 1; i < n; i += 2) {
-    result.push(matchups[i]);
-  }
 
-  return result;
+  return seeds;
 }

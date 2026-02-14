@@ -6,11 +6,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-
-interface SetScore {
-  team1: number;
-  team2: number;
-}
+import type { SetScore } from "@/server/lib/scoring-validation";
 
 interface TeamInfo {
   id: string;

@@ -15,6 +15,16 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/ui/loading-state";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { TeamFormDialog } from "./team-form-dialog";
 import { BulkAddTeamsDialog } from "./bulk-add-teams-dialog";
 
@@ -23,6 +33,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [editingTeam, setEditingTeam] = useState<{
     id: string;
     name: string;
@@ -125,15 +136,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Delete team "${team.name}"? This cannot be undone.`
-                            )
-                          ) {
-                            deleteTeam.mutate({ id: team.id, tournamentId });
-                          }
-                        }}
+                        onClick={() => setDeleteTarget({ id: team.id, name: team.name })}
                         disabled={deleteTeam.isPending}
                       >
                         Delete
@@ -180,6 +183,33 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
         onSubmit={(teams) => bulkCreate.mutate({ tournamentId, teams })}
         isPending={bulkCreate.isPending}
       />
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the team. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  deleteTeam.mutate({ id: deleteTarget.id, tournamentId });
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

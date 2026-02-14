@@ -83,11 +83,6 @@ export function PoolManager({ roundId, tournamentId }: PoolManagerProps) {
     })
   );
 
-  // Get all pool team IDs to find unassigned teams
-  const assignedTeamIds = new Set(
-    pools?.flatMap((p) => p.poolTeams.map((pt) => pt.teamId)) ?? []
-  );
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">

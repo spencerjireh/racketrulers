@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-interface ScoringConfig {
-  pointsPerSet: number;
-  totalSets: number;
-  deuceEnabled: boolean;
-  maxPoints: number;
-}
-
-interface SetScore {
-  team1: number;
-  team2: number;
-}
+import { type ScoringConfig, type SetScore, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
 
 interface ScoreEntryDialogProps {
   open: boolean;
@@ -37,13 +26,6 @@ interface ScoreEntryDialogProps {
   isPending: boolean;
 }
 
-const DEFAULT_CONFIG: ScoringConfig = {
-  pointsPerSet: 21,
-  totalSets: 3,
-  deuceEnabled: true,
-  maxPoints: 30,
-};
-
 export function ScoreEntryDialog({
   open,
   onOpenChange,
@@ -52,11 +34,11 @@ export function ScoreEntryDialog({
   onCancel,
   team1,
   team2,
-  scoringConfig = DEFAULT_CONFIG,
+  scoringConfig = DEFAULT_SCORING_CONFIG,
   currentSetScores,
   isPending,
 }: ScoreEntryDialogProps) {
-  const config = scoringConfig ?? DEFAULT_CONFIG;
+  const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
   const [sets, setSets] = useState<{ t1: string; t2: string }[]>([]);
   const [error, setError] = useState("");
 
@@ -88,22 +70,30 @@ export function ScoreEntryDialog({
     setError("");
   }
 
-  // Calculate running tally
-  const tally = { team1: 0, team2: 0 };
   const setsToWin = Math.ceil(config.totalSets / 2);
-  let matchDecided = false;
 
-  for (const set of sets) {
-    const t1 = parseInt(set.t1);
-    const t2 = parseInt(set.t2);
-    if (isNaN(t1) || isNaN(t2)) break;
-    if (t1 > t2) tally.team1++;
-    else if (t2 > t1) tally.team2++;
-    if (tally.team1 === setsToWin || tally.team2 === setsToWin) {
-      matchDecided = true;
-      break;
+  // Single computation for running tally and per-index sets-won (used for disabling rows)
+  const { tally, matchDecided, setsWonPerIndex } = useMemo(() => {
+    const t = { team1: 0, team2: 0 };
+    let decided = false;
+    const perIndex: { team1: number; team2: number }[] = [{ team1: 0, team2: 0 }];
+
+    for (const set of sets) {
+      const s1 = parseInt(set.t1);
+      const s2 = parseInt(set.t2);
+      if (isNaN(s1) || isNaN(s2)) break;
+      if (s1 > s2) t.team1++;
+      else if (s2 > s1) t.team2++;
+      if (t.team1 === setsToWin || t.team2 === setsToWin) {
+        decided = true;
+        perIndex.push({ team1: t.team1, team2: t.team2 });
+        break;
+      }
+      perIndex.push({ team1: t.team1, team2: t.team2 });
     }
-  }
+
+    return { tally: t, matchDecided: decided, setsWonPerIndex: perIndex };
+  }, [sets, setsToWin]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -152,18 +142,10 @@ export function ScoreEntryDialog({
           {/* Set rows */}
           <div className="space-y-2">
             {sets.map((set, i) => {
-              // Determine if this set should be disabled (match already decided in earlier set)
-              let setsWonBefore = { team1: 0, team2: 0 };
-              for (let j = 0; j < i; j++) {
-                const t1 = parseInt(sets[j].t1);
-                const t2 = parseInt(sets[j].t2);
-                if (isNaN(t1) || isNaN(t2)) break;
-                if (t1 > t2) setsWonBefore.team1++;
-                else if (t2 > t1) setsWonBefore.team2++;
-              }
+              const before = setsWonPerIndex[i] ?? { team1: 0, team2: 0 };
               const setDisabled =
-                setsWonBefore.team1 === setsToWin ||
-                setsWonBefore.team2 === setsToWin;
+                before.team1 === setsToWin ||
+                before.team2 === setsToWin;
 
               return (
                 <div

@@ -18,15 +18,11 @@ export function usePersistedState<T>(
 
   useEffect(() => {
     try {
-      if (state === defaultValue) {
-        localStorage.removeItem(key);
-      } else {
-        localStorage.setItem(key, JSON.stringify(state));
-      }
+      localStorage.setItem(key, JSON.stringify(state));
     } catch {
       // Storage full or unavailable
     }
-  }, [key, state, defaultValue]);
+  }, [key, state]);
 
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {

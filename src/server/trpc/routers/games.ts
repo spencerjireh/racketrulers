@@ -15,6 +15,7 @@ import {
   type SetScore,
   DEFAULT_SCORING_CONFIG,
 } from "@/server/lib/scoring-validation";
+import { stripUndefined } from "@/lib/utils";
 import { generateSchedule } from "@/server/lib/schedule-generation";
 import { analyzeCascade, getGamesToClear } from "@/server/lib/bracket-cascade";
 
@@ -169,6 +170,7 @@ export const gamesRouter = createTRPCRouter({
         where: {
           round: {
             tournamentId: input.tournamentId,
+            tournament: { deletedAt: null },
             ...(input.roundId ? { id: input.roundId } : {}),
           },
           ...dateFilter,
@@ -223,17 +225,17 @@ export const gamesRouter = createTRPCRouter({
         });
       }
 
-      const newWinnerId =
-        validation.setsWon.team1 > validation.setsWon.team2
-          ? (await ctx.prisma.game.findUnique({ where: { id: input.id }, select: { team1Id: true } }))?.team1Id ?? null
-          : (await ctx.prisma.game.findUnique({ where: { id: input.id }, select: { team2Id: true } }))?.team2Id ?? null;
-
-      // Fetch current game state to check for winner change
+      // Fetch current game state (used for winner derivation + cascade check)
       const currentGame = await ctx.prisma.game.findUnique({
         where: { id: input.id },
         include: { round: true },
       });
       if (!currentGame) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const newWinnerId =
+        validation.setsWon.team1 > validation.setsWon.team2
+          ? currentGame.team1Id
+          : currentGame.team2Id;
 
       const isBracket = currentGame.round.type === "SINGLE_ELIM" || currentGame.round.type === "DOUBLE_ELIM";
 
@@ -263,11 +265,12 @@ export const gamesRouter = createTRPCRouter({
         if (cascade.scoredDownstreamGames.length > 0 && !input.confirmCascade) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: JSON.stringify({
+            message: "Score edit affects downstream bracket games",
+            cause: {
               type: "CASCADE_REQUIRED",
               downstreamCount: cascade.downstreamGames.length,
               scoredCount: cascade.scoredDownstreamGames.length,
-            }),
+            },
           });
         }
 
@@ -319,42 +322,44 @@ export const gamesRouter = createTRPCRouter({
           }
         });
       } else {
-        // No cascade needed -- simple update + advance
-        await ctx.prisma.game.update({
-          where: { id: input.id },
-          data: {
-            setScores: input.setScores,
-            scoreTeam1: validation.setsWon.team1,
-            scoreTeam2: validation.setsWon.team2,
-            status: "COMPLETED",
-          },
-        });
-
-        if (isBracket) {
-          const nextGames = await ctx.prisma.game.findMany({
-            where: {
-              OR: [
-                { feederGame1Id: input.id },
-                { feederGame2Id: input.id },
-              ],
+        // No cascade needed -- simple update + advance (in transaction)
+        await ctx.prisma.$transaction(async (tx) => {
+          await tx.game.update({
+            where: { id: input.id },
+            data: {
+              setScores: input.setScores,
+              scoreTeam1: validation.setsWon.team1,
+              scoreTeam2: validation.setsWon.team2,
+              status: "COMPLETED",
             },
           });
 
-          for (const next of nextGames) {
-            if (next.feederGame1Id === input.id) {
-              await ctx.prisma.game.update({
-                where: { id: next.id },
-                data: { team1Id: newWinnerId },
-              });
-            }
-            if (next.feederGame2Id === input.id) {
-              await ctx.prisma.game.update({
-                where: { id: next.id },
-                data: { team2Id: newWinnerId },
-              });
+          if (isBracket) {
+            const nextGames = await tx.game.findMany({
+              where: {
+                OR: [
+                  { feederGame1Id: input.id },
+                  { feederGame2Id: input.id },
+                ],
+              },
+            });
+
+            for (const next of nextGames) {
+              if (next.feederGame1Id === input.id) {
+                await tx.game.update({
+                  where: { id: next.id },
+                  data: { team1Id: newWinnerId },
+                });
+              }
+              if (next.feederGame2Id === input.id) {
+                await tx.game.update({
+                  where: { id: next.id },
+                  data: { team2Id: newWinnerId },
+                });
+              }
             }
           }
-        }
+        });
       }
 
       const updatedGame = await ctx.prisma.game.findUnique({
@@ -369,7 +374,7 @@ export const gamesRouter = createTRPCRouter({
         scoreTeam1: validation.setsWon.team1,
         scoreTeam2: validation.setsWon.team2,
         status: "COMPLETED",
-      }).catch(() => {});
+      });
 
       return updatedGame;
     }),
@@ -403,9 +408,44 @@ export const gamesRouter = createTRPCRouter({
         }
       }
 
-      const updated = await ctx.prisma.game.update({
-        where: { id: input.id },
-        data,
+      const updated = await ctx.prisma.$transaction(async (tx) => {
+        const result = await tx.game.update({
+          where: { id: input.id },
+          data,
+          include: { round: true },
+        });
+
+        // Advance forfeit winner in bracket rounds
+        if (
+          input.status === "FORFEIT" &&
+          input.forfeitWinnerId &&
+          (result.round.type === "SINGLE_ELIM" || result.round.type === "DOUBLE_ELIM")
+        ) {
+          const nextGames = await tx.game.findMany({
+            where: {
+              OR: [
+                { feederGame1Id: input.id },
+                { feederGame2Id: input.id },
+              ],
+            },
+          });
+          for (const next of nextGames) {
+            if (next.feederGame1Id === input.id) {
+              await tx.game.update({
+                where: { id: next.id },
+                data: { team1Id: input.forfeitWinnerId },
+              });
+            }
+            if (next.feederGame2Id === input.id) {
+              await tx.game.update({
+                where: { id: next.id },
+                data: { team2Id: input.forfeitWinnerId },
+              });
+            }
+          }
+        }
+
+        return result;
       });
 
       emitToTournament(input.tournamentId, "score:updated", {
@@ -415,7 +455,7 @@ export const gamesRouter = createTRPCRouter({
         scoreTeam1: updated.scoreTeam1,
         scoreTeam2: updated.scoreTeam2,
         status: updated.status,
-      }).catch(() => {});
+      });
 
       return updated;
     }),
@@ -434,15 +474,12 @@ export const gamesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const data: Record<string, unknown> = {};
-      if (input.scheduledAt !== undefined)
-        data.scheduledAt = new Date(input.scheduledAt);
-      if (input.locationId !== undefined)
-        data.locationId = input.locationId;
-      if (input.durationMinutes !== undefined)
-        data.durationMinutes = input.durationMinutes;
-      if (input.matchType !== undefined)
-        data.matchType = input.matchType;
+      const data = stripUndefined({
+        scheduledAt: input.scheduledAt !== undefined ? new Date(input.scheduledAt) : undefined,
+        locationId: input.locationId,
+        durationMinutes: input.durationMinutes,
+        matchType: input.matchType,
+      });
 
       const updated = await ctx.prisma.game.update({
         where: { id: input.id },
@@ -453,7 +490,7 @@ export const gamesRouter = createTRPCRouter({
         gameId: updated.id,
         scheduledAt: updated.scheduledAt,
         locationId: updated.locationId,
-      }).catch(() => {});
+      });
 
       return updated;
     }),
@@ -475,7 +512,7 @@ export const gamesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const results = await Promise.all(
+      const results = await ctx.prisma.$transaction(
         input.updates.map((update) => {
           const data: Record<string, unknown> = {};
           if (update.scheduledAt !== undefined)
@@ -495,7 +532,7 @@ export const gamesRouter = createTRPCRouter({
       emitToTournament(input.tournamentId, "schedule:updated", {
         batchUpdate: true,
         count: results.length,
-      }).catch(() => {});
+      });
 
       return { updated: results.length };
     }),
@@ -533,11 +570,12 @@ export const gamesRouter = createTRPCRouter({
         if (scoredDownstream.length > 0 && !input.confirmCascade) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: JSON.stringify({
+            message: "Score reset affects downstream bracket games",
+            cause: {
               type: "CASCADE_REQUIRED",
               downstreamCount: clearActions.length,
               scoredCount: scoredDownstream.length,
-            }),
+            },
           });
         }
 
@@ -586,7 +624,7 @@ export const gamesRouter = createTRPCRouter({
         scoreTeam1: null,
         scoreTeam2: null,
         status: "SCHEDULED",
-      }).catch(() => {});
+      });
 
       return ctx.prisma.game.findUnique({ where: { id: input.id } });
     }),
@@ -679,32 +717,32 @@ export const gamesRouter = createTRPCRouter({
         });
       }
 
-      // Optionally clear existing schedule
-      if (input.clearExisting) {
-        await ctx.prisma.game.updateMany({
-          where: { round: { tournamentId: input.tournamentId } },
-          data: { scheduledAt: null, locationId: null },
-        });
-      }
+      await ctx.prisma.$transaction(async (tx) => {
+        // Optionally clear existing schedule
+        if (input.clearExisting) {
+          await tx.game.updateMany({
+            where: { round: { tournamentId: input.tournamentId } },
+            data: { scheduledAt: null, locationId: null },
+          });
+        }
 
-      // Batch-update games with assignments
-      await Promise.all(
-        result.assignments.map((a) =>
-          ctx.prisma.game.update({
+        // Batch-update games with assignments sequentially to avoid pool exhaustion
+        for (const a of result.assignments) {
+          await tx.game.update({
             where: { id: a.gameId },
             data: {
               scheduledAt: new Date(a.scheduledAt),
               locationId: a.locationId,
               durationMinutes: a.durationMinutes,
             },
-          })
-        )
-      );
+          });
+        }
+      });
 
       emitToTournament(input.tournamentId, "schedule:updated", {
         batchUpdate: true,
         count: result.assignments.length,
-      }).catch(() => {});
+      });
 
       return { scheduled: result.assignments.length };
     }),
@@ -738,8 +776,8 @@ export const gamesRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const round = await ctx.prisma.round.findUnique({
-        where: { id: input.roundId },
+      const round = await ctx.prisma.round.findFirst({
+        where: { id: input.roundId, tournament: { deletedAt: null } },
         include: {
           tournament: {
             select: { pointsConfig: true, tiebreakerConfig: true },

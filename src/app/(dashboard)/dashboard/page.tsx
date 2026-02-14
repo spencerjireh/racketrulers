@@ -1,11 +1,11 @@
-import { auth } from "@/lib/auth";
+import { getRequiredSession } from "@/lib/auth-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const session = await auth();
+  const session = await getRequiredSession();
 
   return (
     <div className="space-y-6">

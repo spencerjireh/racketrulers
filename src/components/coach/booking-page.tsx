@@ -69,12 +69,12 @@ export function BookingPage({ slug }: BookingPageProps) {
     return <p className="text-sm text-muted-foreground">Coach not found.</p>;
   }
 
-  if (confirmed) {
+  if (confirmed && selectedSlot) {
     return (
       <BookingConfirmation
         coachName={coach.displayName}
         date={selectedDate}
-        startTime={selectedSlot!}
+        startTime={selectedSlot}
         bookerName={bookerName}
       />
     );

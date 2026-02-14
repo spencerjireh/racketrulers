@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, createTRPCRouter } from "../init";
 import { verifyTournamentOwnership } from "../helpers";
 
@@ -53,6 +54,12 @@ export const locationsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+
+      const location = await ctx.prisma.location.findFirst({
+        where: { id: input.id, tournamentId: input.tournamentId },
+      });
+      if (!location) throw new TRPCError({ code: "NOT_FOUND" });
+
       return ctx.prisma.location.delete({
         where: { id: input.id },
       });

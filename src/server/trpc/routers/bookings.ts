@@ -135,32 +135,33 @@ export const bookingsRouter = createTRPCRouter({
       const endM = totalMinutes % 60;
       const endTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
 
-      // Race condition guard: check if slot is still available
-      const existingBooking = await ctx.prisma.booking.findFirst({
-        where: {
-          coachProfileId: profile.id,
-          date: new Date(input.date),
-          startTime: input.startTime,
-          status: "CONFIRMED",
-        },
-      });
-      if (existingBooking) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "This time slot has already been booked",
+      return ctx.prisma.$transaction(async (tx) => {
+        const existingBooking = await tx.booking.findFirst({
+          where: {
+            coachProfileId: profile.id,
+            date: new Date(input.date),
+            startTime: input.startTime,
+            status: "CONFIRMED",
+          },
         });
-      }
+        if (existingBooking) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "This time slot has already been booked",
+          });
+        }
 
-      return ctx.prisma.booking.create({
-        data: {
-          date: new Date(input.date),
-          startTime: input.startTime,
-          endTime,
-          bookerName: input.bookerName,
-          bookerEmail: input.bookerEmail,
-          message: input.message || null,
-          coachProfileId: profile.id,
-        },
-      });
+        return tx.booking.create({
+          data: {
+            date: new Date(input.date),
+            startTime: input.startTime,
+            endTime,
+            bookerName: input.bookerName,
+            bookerEmail: input.bookerEmail,
+            message: input.message || null,
+            coachProfileId: profile.id,
+          },
+        });
+      }, { isolationLevel: "Serializable" });
     }),
 });

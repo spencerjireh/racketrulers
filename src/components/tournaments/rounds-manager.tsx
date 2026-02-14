@@ -12,6 +12,16 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { RoundFormDialog } from "./round-form-dialog";
 import { PoolManager } from "./pool-manager";
 import { GamesList } from "./games-list";
@@ -25,6 +35,11 @@ export function RoundsManager({ tournamentId }: RoundsManagerProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [expandedRound, setExpandedRound] = usePersistedState<string | null>(
     `collapsible:rounds:${tournamentId}`,
     null
@@ -110,23 +125,27 @@ export function RoundsManager({ tournamentId }: RoundsManagerProps) {
                 setExpandedRound(open ? round.id : null)
               }
               onDelete={() => {
-                if (
-                  confirm(
-                    `Delete round "${round.name}"? This will delete all pools and games.`
-                  )
-                ) {
-                  deleteRound.mutate({ id: round.id, tournamentId });
-                }
+                setConfirmAction({
+                  title: `Delete "${round.name}"?`,
+                  description: "This will delete all pools and games in this round. This cannot be undone.",
+                  onConfirm: () => {
+                    deleteRound.mutate({ id: round.id, tournamentId });
+                    setConfirmAction(null);
+                  },
+                });
               }}
               onGenerate={() =>
                 generateGames.mutate({ id: round.id, tournamentId })
               }
               onClear={() => {
-                if (
-                  confirm("Clear all games in this round?")
-                ) {
-                  clearGames.mutate({ id: round.id, tournamentId });
-                }
+                setConfirmAction({
+                  title: "Clear all games?",
+                  description: "All games in this round will be deleted. This cannot be undone.",
+                  onConfirm: () => {
+                    clearGames.mutate({ id: round.id, tournamentId });
+                    setConfirmAction(null);
+                  },
+                });
               }}
               isGenerating={generateGames.isPending}
             />
@@ -146,6 +165,24 @@ export function RoundsManager({ tournamentId }: RoundsManagerProps) {
         }
         isPending={createRound.isPending}
       />
+
+      <AlertDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => { if (!open) setConfirmAction(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmAction?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmAction?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAction?.onConfirm}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

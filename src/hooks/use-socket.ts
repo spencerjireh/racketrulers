@@ -3,19 +3,25 @@
 import { useEffect, useRef, useCallback } from "react";
 import Pusher, { Channel } from "pusher-js";
 
-const SOKETI_KEY = process.env.NEXT_PUBLIC_SOKETI_KEY!;
-const SOKETI_HOST = process.env.NEXT_PUBLIC_SOKETI_HOST!;
-const SOKETI_PORT = Number(process.env.NEXT_PUBLIC_SOKETI_PORT || "443");
-
 let pusherInstance: Pusher | null = null;
 
 function getPusher() {
   if (!pusherInstance) {
-    pusherInstance = new Pusher(SOKETI_KEY, {
-      wsHost: SOKETI_HOST,
-      wsPort: SOKETI_PORT,
-      wssPort: SOKETI_PORT,
-      forceTLS: SOKETI_PORT === 443,
+    const key = process.env.NEXT_PUBLIC_SOKETI_KEY;
+    const host = process.env.NEXT_PUBLIC_SOKETI_HOST;
+    const port = Number(process.env.NEXT_PUBLIC_SOKETI_PORT || "443");
+
+    if (!key || !host) {
+      throw new Error(
+        "Missing NEXT_PUBLIC_SOKETI_KEY or NEXT_PUBLIC_SOKETI_HOST env vars"
+      );
+    }
+
+    pusherInstance = new Pusher(key, {
+      wsHost: host,
+      wsPort: port,
+      wssPort: port,
+      forceTLS: port === 443,
       enabledTransports: ["ws", "wss"],
       cluster: "",
     });
