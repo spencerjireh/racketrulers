@@ -1,13 +1,16 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useMemo, useState } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
+import { CalendarClock } from "lucide-react";
 import { RoundsManager } from "@/components/tournaments/rounds-manager";
 import { ScoresManager } from "@/components/tournaments/scores-manager";
 import { ScheduleCalendar } from "@/components/tournaments/schedule-calendar";
 import { BracketView } from "@/components/tournaments/bracket-view";
+import { AutoScheduleDialog } from "@/components/tournaments/auto-schedule-dialog";
 import { LoadingState } from "@/components/ui/loading-state";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRealtimeTournament } from "@/hooks/use-realtime-event";
 
@@ -19,6 +22,7 @@ export default function TournamentBracketPage({
   const { id: tournamentId } = use(params);
   const trpc = useTRPC();
   useRealtimeTournament(tournamentId);
+  const [autoScheduleOpen, setAutoScheduleOpen] = useState(false);
 
   const { data: tournament, isLoading } = useQuery(
     trpc.tournaments.getById.queryOptions({ id: tournamentId })
@@ -37,6 +41,18 @@ export default function TournamentBracketPage({
     [rounds]
   );
 
+  const totalGames = useMemo(
+    () => rounds?.reduce((sum, r) => sum + r._count.games, 0) ?? 0,
+    [rounds]
+  );
+
+  const dayCount = useMemo(() => {
+    if (!tournament) return 0;
+    const start = new Date(tournament.startDate);
+    const end = new Date(tournament.endDate);
+    return Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  }, [tournament]);
+
   if (isLoading) {
     return <LoadingState text="Loading bracket..." />;
   }
@@ -45,10 +61,32 @@ export default function TournamentBracketPage({
     return <p className="text-sm text-muted-foreground">Tournament not found.</p>;
   }
 
+  const courtCount = tournament.locations?.length ?? 0;
   const defaultTab = singleElimRound ? "bracket" : "rounds";
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAutoScheduleOpen(true)}
+          disabled={totalGames === 0 || courtCount === 0}
+        >
+          <CalendarClock className="mr-2 h-4 w-4" />
+          Auto Schedule
+        </Button>
+      </div>
+
+      <AutoScheduleDialog
+        open={autoScheduleOpen}
+        onOpenChange={setAutoScheduleOpen}
+        tournamentId={tournamentId}
+        courtCount={courtCount}
+        gameCount={totalGames}
+        dayCount={dayCount}
+      />
+
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           {singleElimRound && (
