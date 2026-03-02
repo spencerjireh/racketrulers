@@ -57,4 +57,4 @@ npm run dev             # start dev server on port 3000
 
 ## License
 
-Private
+[MIT](LICENSE)
