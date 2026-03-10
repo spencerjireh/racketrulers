@@ -88,7 +88,7 @@ describe("generateSingleElimGames", () => {
     const byeGames = games.filter(
       (g) =>
         g.bracketRound === 0 &&
-        ((g.team1Id === null) !== (g.team2Id === null))
+        ((g.participant1Id === null) !== (g.participant2Id === null))
     );
     expect(byeGames.length).toBe(3); // 8 - 5 = 3 byes
 
@@ -104,8 +104,8 @@ describe("generateSingleElimGames", () => {
   it("handles 2 teams (minimum)", () => {
     const games = generateSingleElimGames(["a", "b"]);
     expect(games).toHaveLength(1);
-    expect(games[0].team1Id).toBe("a");
-    expect(games[0].team2Id).toBe("b");
+    expect(games[0].participant1Id).toBe("a");
+    expect(games[0].participant2Id).toBe("b");
     expect(games[0].bracketRound).toBe(0);
   });
 
@@ -115,7 +115,7 @@ describe("generateSingleElimGames", () => {
     expect(games).toHaveLength(3);
 
     const byeGames = games.filter(
-      (g) => g.bracketRound === 0 && (g.team1Id === null || g.team2Id === null)
+      (g) => g.bracketRound === 0 && (g.participant1Id === null || g.participant2Id === null)
     );
     expect(byeGames.length).toBe(1);
   });
@@ -134,14 +134,14 @@ describe("computeBracketLayout", () => {
       {
         index: 0,
         games: [
-          { id: "g1", feederGame1Id: null, feederGame2Id: null },
-          { id: "g2", feederGame1Id: null, feederGame2Id: null },
+          { id: "g1", feederMatch1Id: null, feederMatch2Id: null },
+          { id: "g2", feederMatch1Id: null, feederMatch2Id: null },
         ],
       },
       {
         index: 1,
         games: [
-          { id: "g3", feederGame1Id: "g1", feederGame2Id: "g2" },
+          { id: "g3", feederMatch1Id: "g1", feederMatch2Id: "g2" },
         ],
       },
     ];
@@ -173,23 +173,23 @@ describe("computeBracketLayout", () => {
       {
         index: 0,
         games: [
-          { id: "g1", feederGame1Id: null, feederGame2Id: null },
-          { id: "g2", feederGame1Id: null, feederGame2Id: null },
-          { id: "g3", feederGame1Id: null, feederGame2Id: null },
-          { id: "g4", feederGame1Id: null, feederGame2Id: null },
+          { id: "g1", feederMatch1Id: null, feederMatch2Id: null },
+          { id: "g2", feederMatch1Id: null, feederMatch2Id: null },
+          { id: "g3", feederMatch1Id: null, feederMatch2Id: null },
+          { id: "g4", feederMatch1Id: null, feederMatch2Id: null },
         ],
       },
       {
         index: 1,
         games: [
-          { id: "sf1", feederGame1Id: "g1", feederGame2Id: "g2" },
-          { id: "sf2", feederGame1Id: "g3", feederGame2Id: "g4" },
+          { id: "sf1", feederMatch1Id: "g1", feederMatch2Id: "g2" },
+          { id: "sf2", feederMatch1Id: "g3", feederMatch2Id: "g4" },
         ],
       },
       {
         index: 2,
         games: [
-          { id: "final", feederGame1Id: "sf1", feederGame2Id: "sf2" },
+          { id: "final", feederMatch1Id: "sf1", feederMatch2Id: "sf2" },
         ],
       },
     ];
@@ -213,21 +213,21 @@ describe("computeBracketLayout", () => {
     // Build 16-team bracket structure
     const r0 = Array.from({ length: 8 }, (_, i) => ({
       id: `r0_${i}`,
-      feederGame1Id: null,
-      feederGame2Id: null,
+      feederMatch1Id: null,
+      feederMatch2Id: null,
     }));
     const r1 = Array.from({ length: 4 }, (_, i) => ({
       id: `r1_${i}`,
-      feederGame1Id: r0[i * 2].id,
-      feederGame2Id: r0[i * 2 + 1].id,
+      feederMatch1Id: r0[i * 2].id,
+      feederMatch2Id: r0[i * 2 + 1].id,
     }));
     const r2 = Array.from({ length: 2 }, (_, i) => ({
       id: `r2_${i}`,
-      feederGame1Id: r1[i * 2].id,
-      feederGame2Id: r1[i * 2 + 1].id,
+      feederMatch1Id: r1[i * 2].id,
+      feederMatch2Id: r1[i * 2 + 1].id,
     }));
     const r3 = [
-      { id: "final", feederGame1Id: r2[0].id, feederGame2Id: r2[1].id },
+      { id: "final", feederMatch1Id: r2[0].id, feederMatch2Id: r2[1].id },
     ];
 
     const rounds = [

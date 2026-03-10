@@ -31,104 +31,67 @@ export function ScoresManager({ tournamentId }: { tournamentId: string }) {
     maxPoints: 30,
   };
 
-  const { data: allGames, isLoading } = useQuery(
-    trpc.games.listByTournament.queryOptions({ tournamentId })
+  const { data: allMatches, isLoading } = useQuery(
+    trpc.matches.listByTournament.queryOptions({ tournamentId })
   );
 
-  // Group games by round -> pool
-  const grouped = new Map<
-    string,
-    {
-      roundName: string;
-      roundId: string;
-      roundType: string;
-      pools: Map<string, { poolName: string; games: typeof allGames }>;
-      unpooledGames: typeof allGames;
-    }
-  >();
+  const isRoundRobin = tournament?.format === "ROUND_ROBIN";
 
-  if (allGames) {
-    for (const game of allGames) {
-      const roundId = game.round.id;
-      if (!grouped.has(roundId)) {
-        grouped.set(roundId, {
-          roundName: game.round.name,
-          roundId,
-          roundType: game.round.type,
-          pools: new Map(),
-          unpooledGames: [],
-        });
-      }
-      const roundGroup = grouped.get(roundId)!;
+  // Group matches by round number (null rounds go last)
+  const grouped = new Map<number | null, typeof allMatches>();
 
-      if (game.pool) {
-        if (!roundGroup.pools.has(game.pool.id)) {
-          roundGroup.pools.set(game.pool.id, {
-            poolName: game.pool.name,
-            games: [],
-          });
-        }
-        roundGroup.pools.get(game.pool.id)!.games!.push(game);
-      } else {
-        roundGroup.unpooledGames!.push(game);
-      }
+  if (allMatches) {
+    for (const match of allMatches) {
+      const round = match.round ?? null;
+      if (!grouped.has(round)) grouped.set(round, []);
+      grouped.get(round)!.push(match);
     }
   }
+
+  // Sort: numbered rounds first (ascending), then null
+  const sortedRounds = Array.from(grouped.keys()).sort((a, b) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
 
   return (
     <div className="space-y-4">
       {isLoading ? (
-        <LoadingState text="Loading games..." />
+        <LoadingState text="Loading matches..." />
       ) : grouped.size > 0 ? (
-        Array.from(grouped.entries()).map(([roundId, roundGroup]) => (
-          <Card key={roundId}>
-            <CardHeader>
-              <CardTitle>{roundGroup.roundName}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {roundGroup.pools.size > 0 &&
-                Array.from(roundGroup.pools.entries()).map(
-                  ([poolId, poolGroup]) => (
-                    <div key={poolId} className="space-y-2">
-                      <h4 className="text-xs font-medium text-muted-foreground">
-                        {poolGroup.poolName}
-                      </h4>
-                      <GamesList
-                        games={poolGroup.games!}
-                        tournamentId={tournamentId}
-                        scoringConfig={scoringConfig}
-                      />
-                      {roundGroup.roundType === "ROUND_ROBIN" && (
-                        <StandingsTable
-                          roundId={roundId}
-                          poolId={poolId}
-                          title={`${poolGroup.poolName} Standings`}
-                        />
-                      )}
-                    </div>
-                  )
-                )}
-
-              {roundGroup.unpooledGames!.length > 0 && (
+        <>
+          {sortedRounds.map((round) => (
+            <Card key={round ?? "unrounded"}>
+              <CardHeader>
+                <CardTitle>{round !== null ? `Round ${round}` : "Matches"}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <GamesList
-                  games={roundGroup.unpooledGames!}
+                  games={grouped.get(round)!}
                   tournamentId={tournamentId}
                   scoringConfig={scoringConfig}
                 />
-              )}
+              </CardContent>
+            </Card>
+          ))}
 
-              {roundGroup.roundType === "ROUND_ROBIN" &&
-                roundGroup.pools.size === 0 && (
-                  <StandingsTable roundId={roundId} />
-                )}
-            </CardContent>
-          </Card>
-        ))
+          {isRoundRobin && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Standings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StandingsTable tournamentId={tournamentId} />
+              </CardContent>
+            </Card>
+          )}
+        </>
       ) : (
         <Card>
           <CardContent className="py-8">
             <p className="text-sm text-muted-foreground text-center">
-              No games to score. Generate games in the Schedule tab first.
+              No matches to score. Start the tournament to generate matches.
             </p>
           </CardContent>
         </Card>

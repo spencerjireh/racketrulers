@@ -21,16 +21,16 @@ export default async function ManageTournamentLayout({
   }
 
   const statusLabel =
-    tournament.status === "DRAFT"
-      ? "Draft"
-      : tournament.status === "PUBLISHED"
+    tournament.status === "PENDING"
+      ? "Setup"
+      : tournament.status === "UNDERWAY"
         ? "Active"
         : "Completed";
 
   const statusVariant =
-    tournament.status === "DRAFT"
+    tournament.status === "PENDING"
       ? "outline"
-      : tournament.status === "PUBLISHED"
+      : tournament.status === "UNDERWAY"
         ? "default"
         : "secondary";
 

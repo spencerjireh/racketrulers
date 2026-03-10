@@ -12,7 +12,7 @@ export const locationsRouter = createTRPCRouter({
         where: { tournamentId: input.tournamentId },
         orderBy: { createdAt: "asc" },
         include: {
-          _count: { select: { games: true } },
+          _count: { select: { matches: true } },
         },
       });
     }),

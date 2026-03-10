@@ -12,16 +12,15 @@ import {
 } from "@/components/ui/table";
 
 interface StandingsTableProps {
-  roundId: string;
-  poolId?: string;
+  tournamentId: string;
   title?: string;
 }
 
-export function StandingsTable({ roundId, poolId, title }: StandingsTableProps) {
+export function StandingsTable({ tournamentId, title }: StandingsTableProps) {
   const trpc = useTRPC();
 
   const { data: standings } = useQuery(
-    trpc.games.getStandings.queryOptions({ roundId, poolId })
+    trpc.matches.getStandings.queryOptions({ tournamentId })
   );
 
   if (!standings || standings.length === 0) return null;
@@ -35,7 +34,7 @@ export function StandingsTable({ roundId, poolId, title }: StandingsTableProps) 
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
-            <TableHead>Team</TableHead>
+            <TableHead>Participant</TableHead>
             <TableHead className="text-center w-10">GP</TableHead>
             <TableHead className="text-center w-10">W</TableHead>
             <TableHead className="text-center w-10">D</TableHead>
@@ -48,9 +47,9 @@ export function StandingsTable({ roundId, poolId, title }: StandingsTableProps) 
         </TableHeader>
         <TableBody>
           {standings.map((s) => (
-            <TableRow key={s.teamId}>
+            <TableRow key={s.participantId}>
               <TableCell className="font-medium">{s.rank}</TableCell>
-              <TableCell>{s.teamName}</TableCell>
+              <TableCell>{s.participantName}</TableCell>
               <TableCell className="text-center">{s.gamesPlayed}</TableCell>
               <TableCell className="text-center">{s.wins}</TableCell>
               <TableCell className="text-center">{s.draws}</TableCell>

@@ -1,8 +1,8 @@
 interface GameData {
-  team1Id: string | null;
-  team2Id: string | null;
-  scoreTeam1: number | null;
-  scoreTeam2: number | null;
+  participant1Id: string | null;
+  participant2Id: string | null;
+  scoreParticipant1: number | null;
+  scoreParticipant2: number | null;
   status: string;
 }
 
@@ -16,9 +16,9 @@ interface TiebreakerConfig {
   order: string[];
 }
 
-export interface TeamStanding {
-  teamId: string;
-  teamName: string;
+export interface ParticipantStanding {
+  participantId: string;
+  participantName: string;
   rank: number;
   wins: number;
   draws: number;
@@ -31,16 +31,16 @@ export interface TeamStanding {
 }
 
 export function calculateStandings(
-  games: (GameData & { team1?: { id: string; name: string } | null; team2?: { id: string; name: string } | null })[],
+  games: (GameData & { participant1?: { id: string; name: string } | null; participant2?: { id: string; name: string } | null })[],
   pointsConfig: PointsConfig = { win: 2, draw: 1, loss: 0 },
   tiebreakerConfig: TiebreakerConfig = {
     order: ["win_loss", "head_to_head", "point_differential", "points_scored"],
   }
-): TeamStanding[] {
+): ParticipantStanding[] {
   const statsMap = new Map<
     string,
     {
-      teamName: string;
+      participantName: string;
       wins: number;
       draws: number;
       losses: number;
@@ -51,10 +51,10 @@ export function calculateStandings(
     }
   >();
 
-  function ensureTeam(teamId: string, teamName: string) {
-    if (!statsMap.has(teamId)) {
-      statsMap.set(teamId, {
-        teamName,
+  function ensureParticipant(participantId: string, participantName: string) {
+    if (!statsMap.has(participantId)) {
+      statsMap.set(participantId, {
+        participantName,
         wins: 0,
         draws: 0,
         losses: 0,
@@ -66,8 +66,8 @@ export function calculateStandings(
     }
   }
 
-  function ensureH2H(teamId: string, opponentId: string) {
-    const stats = statsMap.get(teamId)!;
+  function ensureH2H(participantId: string, opponentId: string) {
+    const stats = statsMap.get(participantId)!;
     if (!stats.headToHead.has(opponentId)) {
       stats.headToHead.set(opponentId, { wins: 0, losses: 0, draws: 0 });
     }
@@ -75,40 +75,40 @@ export function calculateStandings(
 
   for (const game of games) {
     if (
-      game.status !== "COMPLETED" &&
+      game.status !== "COMPLETE" &&
       game.status !== "FORFEIT"
     )
       continue;
-    if (!game.team1Id || !game.team2Id) continue;
-    if (game.scoreTeam1 === null || game.scoreTeam2 === null) continue;
+    if (!game.participant1Id || !game.participant2Id) continue;
+    if (game.scoreParticipant1 === null || game.scoreParticipant2 === null) continue;
 
-    const t1Name = game.team1?.name ?? game.team1Id;
-    const t2Name = game.team2?.name ?? game.team2Id;
+    const p1Name = game.participant1?.name ?? game.participant1Id;
+    const p2Name = game.participant2?.name ?? game.participant2Id;
 
-    ensureTeam(game.team1Id, t1Name);
-    ensureTeam(game.team2Id, t2Name);
-    ensureH2H(game.team1Id, game.team2Id);
-    ensureH2H(game.team2Id, game.team1Id);
+    ensureParticipant(game.participant1Id, p1Name);
+    ensureParticipant(game.participant2Id, p2Name);
+    ensureH2H(game.participant1Id, game.participant2Id);
+    ensureH2H(game.participant2Id, game.participant1Id);
 
-    const s1 = statsMap.get(game.team1Id)!;
-    const s2 = statsMap.get(game.team2Id)!;
+    const s1 = statsMap.get(game.participant1Id)!;
+    const s2 = statsMap.get(game.participant2Id)!;
 
-    s1.pointsFor += game.scoreTeam1;
-    s1.pointsAgainst += game.scoreTeam2;
+    s1.pointsFor += game.scoreParticipant1;
+    s1.pointsAgainst += game.scoreParticipant2;
     s1.gamesPlayed++;
-    s2.pointsFor += game.scoreTeam2;
-    s2.pointsAgainst += game.scoreTeam1;
+    s2.pointsFor += game.scoreParticipant2;
+    s2.pointsAgainst += game.scoreParticipant1;
     s2.gamesPlayed++;
 
-    const h2h1 = s1.headToHead.get(game.team2Id)!;
-    const h2h2 = s2.headToHead.get(game.team1Id)!;
+    const h2h1 = s1.headToHead.get(game.participant2Id)!;
+    const h2h2 = s2.headToHead.get(game.participant1Id)!;
 
-    if (game.scoreTeam1 > game.scoreTeam2) {
+    if (game.scoreParticipant1 > game.scoreParticipant2) {
       s1.wins++;
       s2.losses++;
       h2h1.wins++;
       h2h2.losses++;
-    } else if (game.scoreTeam1 < game.scoreTeam2) {
+    } else if (game.scoreParticipant1 < game.scoreParticipant2) {
       s2.wins++;
       s1.losses++;
       h2h2.wins++;
@@ -121,10 +121,10 @@ export function calculateStandings(
     }
   }
 
-  const standings: TeamStanding[] = Array.from(statsMap.entries()).map(
-    ([teamId, stats]) => ({
-      teamId,
-      teamName: stats.teamName,
+  const standings: ParticipantStanding[] = Array.from(statsMap.entries()).map(
+    ([participantId, stats]) => ({
+      participantId,
+      participantName: stats.participantName,
       rank: 0,
       wins: stats.wins,
       draws: stats.draws,
@@ -149,10 +149,10 @@ export function calculateStandings(
           diff = b.standingPoints - a.standingPoints;
           break;
         case "head_to_head": {
-          const aStats = statsMap.get(a.teamId)!;
-          const h2h = aStats.headToHead.get(b.teamId);
+          const aStats = statsMap.get(a.participantId)!;
+          const h2h = aStats.headToHead.get(b.participantId);
           if (h2h) {
-            diff = h2h.wins - h2h.losses;
+            diff = h2h.losses - h2h.wins;
           }
           break;
         }

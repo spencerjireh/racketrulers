@@ -21,17 +21,17 @@ export interface AutoScheduleConfig {
   courts: Court[];
 }
 
-export interface ScheduleGameInput {
+export interface ScheduleMatchInput {
   id: string;
-  team1Id: string | null;
-  team2Id: string | null;
+  participant1Id: string | null;
+  participant2Id: string | null;
   status: string;
-  feederGame1Id: string | null;
-  feederGame2Id: string | null;
+  feederMatch1Id: string | null;
+  feederMatch2Id: string | null;
 }
 
 export interface ScheduleAssignment {
-  gameId: string;
+  matchId: string;
   scheduledAt: string; // ISO datetime
   locationId: string;
   durationMinutes: number;
@@ -71,7 +71,7 @@ function buildTimeSlots(
  * Topological sort of games by feeder dependencies (Kahn's algorithm).
  * Games with no feeders come first; downstream games follow their feeders.
  */
-function topologicalSort(games: ScheduleGameInput[]): ScheduleGameInput[] | null {
+function topologicalSort(games: ScheduleMatchInput[]): ScheduleMatchInput[] | null {
   const gameMap = new Map(games.map((g) => [g.id, g]));
   const inDegree = new Map<string, number>();
   const adjacency = new Map<string, string[]>();
@@ -83,12 +83,12 @@ function topologicalSort(games: ScheduleGameInput[]): ScheduleGameInput[] | null
 
   // Build edges: feeder -> downstream
   for (const g of games) {
-    if (g.feederGame1Id && gameMap.has(g.feederGame1Id)) {
-      adjacency.get(g.feederGame1Id)!.push(g.id);
+    if (g.feederMatch1Id && gameMap.has(g.feederMatch1Id)) {
+      adjacency.get(g.feederMatch1Id)!.push(g.id);
       inDegree.set(g.id, (inDegree.get(g.id) ?? 0) + 1);
     }
-    if (g.feederGame2Id && gameMap.has(g.feederGame2Id)) {
-      adjacency.get(g.feederGame2Id)!.push(g.id);
+    if (g.feederMatch2Id && gameMap.has(g.feederMatch2Id)) {
+      adjacency.get(g.feederMatch2Id)!.push(g.id);
       inDegree.set(g.id, (inDegree.get(g.id) ?? 0) + 1);
     }
   }
@@ -98,7 +98,7 @@ function topologicalSort(games: ScheduleGameInput[]): ScheduleGameInput[] | null
     if (deg === 0) queue.push(id);
   }
 
-  const sorted: ScheduleGameInput[] = [];
+  const sorted: ScheduleMatchInput[] = [];
   while (queue.length > 0) {
     const id = queue.shift()!;
     sorted.push(gameMap.get(id)!);
@@ -116,13 +116,13 @@ function topologicalSort(games: ScheduleGameInput[]): ScheduleGameInput[] | null
 /**
  * Check if a game is a completed bye (one team null, already completed).
  */
-function isCompletedBye(game: ScheduleGameInput): boolean {
-  if (game.status !== "COMPLETED" && game.status !== "FORFEIT") return false;
-  return game.team1Id === null || game.team2Id === null;
+function isCompletedBye(game: ScheduleMatchInput): boolean {
+  if (game.status !== "COMPLETE" && game.status !== "FORFEIT") return false;
+  return game.participant1Id === null || game.participant2Id === null;
 }
 
 export function generateSchedule(
-  games: ScheduleGameInput[],
+  games: ScheduleMatchInput[],
   config: AutoScheduleConfig
 ): ScheduleResult {
   if (config.courts.length === 0) {
@@ -182,15 +182,15 @@ export function generateSchedule(
   for (const game of sorted) {
     // Find the earliest feeder completion time
     let earliestStart = 0;
-    if (game.feederGame1Id && gameScheduledTime.has(game.feederGame1Id)) {
-      const feederTime = gameScheduledTime.get(game.feederGame1Id)!;
+    if (game.feederMatch1Id && gameScheduledTime.has(game.feederMatch1Id)) {
+      const feederTime = gameScheduledTime.get(game.feederMatch1Id)!;
       earliestStart = Math.max(
         earliestStart,
         feederTime + config.gameDurationMinutes * 60 * 1000
       );
     }
-    if (game.feederGame2Id && gameScheduledTime.has(game.feederGame2Id)) {
-      const feederTime = gameScheduledTime.get(game.feederGame2Id)!;
+    if (game.feederMatch2Id && gameScheduledTime.has(game.feederMatch2Id)) {
+      const feederTime = gameScheduledTime.get(game.feederMatch2Id)!;
       earliestStart = Math.max(
         earliestStart,
         feederTime + config.gameDurationMinutes * 60 * 1000
@@ -210,29 +210,29 @@ export function generateSchedule(
 
       // Teams must not already be playing at this time
       const team1Busy =
-        game.team1Id &&
-        teamTimeUsed.get(game.team1Id)?.has(slotTime);
+        game.participant1Id &&
+        teamTimeUsed.get(game.participant1Id)?.has(slotTime);
       const team2Busy =
-        game.team2Id &&
-        teamTimeUsed.get(game.team2Id)?.has(slotTime);
+        game.participant2Id &&
+        teamTimeUsed.get(game.participant2Id)?.has(slotTime);
       if (team1Busy || team2Busy) continue;
 
       // Place the game
       courtSlotUsed.add(slot.key);
-      if (game.team1Id) {
-        if (!teamTimeUsed.has(game.team1Id))
-          teamTimeUsed.set(game.team1Id, new Set());
-        teamTimeUsed.get(game.team1Id)!.add(slotTime);
+      if (game.participant1Id) {
+        if (!teamTimeUsed.has(game.participant1Id))
+          teamTimeUsed.set(game.participant1Id, new Set());
+        teamTimeUsed.get(game.participant1Id)!.add(slotTime);
       }
-      if (game.team2Id) {
-        if (!teamTimeUsed.has(game.team2Id))
-          teamTimeUsed.set(game.team2Id, new Set());
-        teamTimeUsed.get(game.team2Id)!.add(slotTime);
+      if (game.participant2Id) {
+        if (!teamTimeUsed.has(game.participant2Id))
+          teamTimeUsed.set(game.participant2Id, new Set());
+        teamTimeUsed.get(game.participant2Id)!.add(slotTime);
       }
       gameScheduledTime.set(game.id, slotTime);
 
       assignments.push({
-        gameId: game.id,
+        matchId: game.id,
         scheduledAt: slot.time.toISOString(),
         locationId: slot.courtId,
         durationMinutes: config.gameDurationMinutes,

@@ -75,9 +75,9 @@ model VerificationToken {
 // ─── Tournament Models ───────────────────────────────────────────────────────
 
 enum TournamentStatus {
-  DRAFT
-  PUBLISHED
-  COMPLETED
+  PENDING
+  UNDERWAY
+  COMPLETE
 
   @@map("event_status")
 }
@@ -88,13 +88,22 @@ model Tournament {
   slug        String           @unique
   description String?
   bannerUrl   String?          @map("banner_url")
-  status      TournamentStatus @default(DRAFT)
+  status      TournamentStatus @default(PENDING)
   timezone    String           @default("America/Toronto")
   startDate   DateTime         @map("start_date")
   endDate     DateTime         @map("end_date")
 
-  format       RoundType?
+  format       TournamentFormat?
   drawsAllowed Boolean @default(false) @map("draws_allowed")
+
+  // Challonge-aligned fields
+  type                 String  @default("SINGLE_STAGE")
+  thirdPlaceMatch      Boolean @default(false) @map("third_place_match")
+  grandFinalsModifier  String? @map("grand_finals_modifier")
+  rankBy               String  @default("MATCH_WINS") @map("rank_by")
+  hideSeeds            Boolean @default(false) @map("hide_seeds")
+  quickAdvance         Boolean @default(false) @map("quick_advance")
+  showStandings        Boolean @default(true) @map("show_standings")
 
   pointsConfig     Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
   scoringConfig    Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
@@ -106,9 +115,9 @@ model Tournament {
 
   deletedAt DateTime? @map("deleted_at")
 
-  rounds    Round[]
-  teams     Team[]
-  locations Location[]
+  matches      Match[]
+  participants Participant[]
+  locations    Location[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -118,75 +127,20 @@ model Tournament {
   @@map("tournaments")
 }
 
-enum RoundType {
+enum TournamentFormat {
   ROUND_ROBIN
   SWISS
   SINGLE_ELIM
   DOUBLE_ELIM
-  CUSTOM
 
   @@map("round_type")
 }
 
-model Round {
-  id    String    @id @default(cuid())
-  name  String
-  type  RoundType
-  order Int       @default(0)
-
-  advancementRules Json? @map("advancement_rules")
-  config           Json? // e.g. { consolation_match: true, reset_match: true }
-  drawsAllowed     Boolean @default(false) @map("draws_allowed")
-  confirmed        Boolean @default(false)
-
-  tournamentId String     @map("tournament_id")
-  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  pools Pool[]
-  games Game[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("rounds")
-}
-
-model Pool {
-  id   String @id @default(cuid())
-  name String
-
-  roundId String @map("round_id")
-  round   Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
-
-  poolTeams PoolTeam[]
-  games     Game[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("pools")
-}
-
-model PoolTeam {
-  id   String @id @default(cuid())
-  seed Int    @default(0)
-
-  poolId String @map("pool_id")
-  pool   Pool   @relation(fields: [poolId], references: [id], onDelete: Cascade)
-
-  teamId String @map("team_id")
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@unique([poolId, teamId])
-  @@map("pool_teams")
-}
-
-enum GameStatus {
-  SCHEDULED
-  IN_PROGRESS
-  COMPLETED
+enum MatchStatus {
+  PENDING
+  OPEN
+  COMPLETE
   FORFEIT
-  CANCELLED
 
   @@map("game_status")
 }
@@ -198,49 +152,47 @@ enum MatchType {
   @@map("match_type")
 }
 
-model Game {
-  id             String     @id @default(cuid())
-  status         GameStatus @default(SCHEDULED)
-  matchType      MatchType  @default(SINGLES) @map("match_type")
-  roundPosition  Int?       @map("round_position")
-  scheduledAt    DateTime?  @map("scheduled_at")
-  durationMinutes Int       @default(60) @map("duration_minutes")
+model Match {
+  id             String      @id @default(cuid())
+  status         MatchStatus @default(PENDING) @map("status")
+  matchType      MatchType   @default(SINGLES) @map("match_type")
+  roundPosition  Int?        @map("round_position")
+  round          Int?        @map("round")
+  scheduledAt    DateTime?   @map("scheduled_at")
+  durationMinutes Int        @default(60) @map("duration_minutes")
 
-  scoreTeam1 Int? @map("score_team1")
-  scoreTeam2 Int? @map("score_team2")
-  setScores  Json? @map("set_scores")
+  scoreParticipant1 Int? @map("score_participant1")
+  scoreParticipant2 Int? @map("score_participant2")
+  setScores         Json? @map("set_scores")
 
-  team1Id String? @map("team1_id")
-  team1   Team?   @relation("GameTeam1", fields: [team1Id], references: [id])
+  participant1Id String?      @map("participant1_id")
+  participant1   Participant? @relation("MatchParticipant1", fields: [participant1Id], references: [id])
 
-  team2Id String? @map("team2_id")
-  team2   Team?   @relation("GameTeam2", fields: [team2Id], references: [id])
+  participant2Id String?      @map("participant2_id")
+  participant2   Participant? @relation("MatchParticipant2", fields: [participant2Id], references: [id])
 
-  roundId String @map("round_id")
-  round   Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
-
-  poolId String? @map("pool_id")
-  pool   Pool?   @relation(fields: [poolId], references: [id])
+  tournamentId String     @map("tournament_id")
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   locationId String?   @map("location_id")
   location   Location? @relation(fields: [locationId], references: [id])
 
-  feederGame1Id String? @map("feeder_game_1_id")
-  feederGame1   Game?   @relation("FeederGame1", fields: [feederGame1Id], references: [id])
-  fedByGame1    Game[]  @relation("FeederGame1")
+  feederMatch1Id String? @map("feeder_match_1_id")
+  feederMatch1   Match?  @relation("FeederMatch1", fields: [feederMatch1Id], references: [id])
+  fedByMatch1    Match[] @relation("FeederMatch1")
 
-  feederGame2Id String? @map("feeder_game_2_id")
-  feederGame2   Game?   @relation("FeederGame2", fields: [feederGame2Id], references: [id])
-  fedByGame2    Game[]  @relation("FeederGame2")
+  feederMatch2Id String? @map("feeder_match_2_id")
+  feederMatch2   Match?  @relation("FeederMatch2", fields: [feederMatch2Id], references: [id])
+  fedByMatch2    Match[] @relation("FeederMatch2")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([roundId, status])
+  @@index([tournamentId, status])
   @@map("games")
 }
 
-model Team {
+model Participant {
   id           String  @id @default(cuid())
   name         String
   captainName  String? @map("captain_name")
@@ -251,9 +203,8 @@ model Team {
   tournamentId String     @map("tournament_id")
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
-  poolTeams    PoolTeam[]
-  gamesAsTeam1 Game[]     @relation("GameTeam1")
-  gamesAsTeam2 Game[]     @relation("GameTeam2")
+  matchesAsParticipant1 Match[] @relation("MatchParticipant1")
+  matchesAsParticipant2 Match[] @relation("MatchParticipant2")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -268,7 +219,7 @@ model Location {
   tournamentId String     @map("tournament_id")
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
-  games Game[]
+  matches Match[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

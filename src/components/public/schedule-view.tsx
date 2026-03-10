@@ -12,55 +12,56 @@ interface PublicScheduleViewProps {
 export function PublicScheduleView({ tournamentId }: PublicScheduleViewProps) {
   const trpc = useTRPC();
 
-  const { data: games, isLoading } = useQuery(
-    trpc.games.listByTournamentPublic.queryOptions({ tournamentId })
+  const { data: matches, isLoading } = useQuery(
+    trpc.matches.listByTournamentPublic.queryOptions({ tournamentId })
   );
 
   if (isLoading) {
     return <LoadingState text="Loading schedule..." />;
   }
 
-  if (!games || games.length === 0) {
+  if (!matches || matches.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No games scheduled yet.
+        No matches scheduled yet.
       </p>
     );
   }
 
-  // Group by round
-  const grouped = new Map<
-    string,
-    { roundName: string; games: typeof games }
-  >();
-
-  for (const game of games) {
-    const roundId = game.round.id;
-    if (!grouped.has(roundId)) {
-      grouped.set(roundId, { roundName: game.round.name, games: [] });
-    }
-    grouped.get(roundId)!.games.push(game);
+  // Group by round number
+  const grouped = new Map<number | null, typeof matches>();
+  for (const match of matches) {
+    const round = match.round ?? null;
+    if (!grouped.has(round)) grouped.set(round, []);
+    grouped.get(round)!.push(match);
   }
+
+  const sortedRounds = Array.from(grouped.keys()).sort((a, b) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
 
   return (
     <div className="space-y-6">
-      {Array.from(grouped.entries()).map(([roundId, roundGroup]) => (
-        <div key={roundId} className="space-y-2">
-          <h2 className="text-lg font-semibold">{roundGroup.roundName}</h2>
+      {sortedRounds.map((round) => (
+        <div key={round ?? "unrounded"} className="space-y-2">
+          {round !== null && (
+            <h2 className="text-lg font-semibold">Round {round}</h2>
+          )}
           <div className="grid gap-2 md:grid-cols-2">
-            {roundGroup.games.map((game) => (
+            {grouped.get(round)!.map((match) => (
               <GameCard
-                key={game.id}
-                team1Name={game.team1?.name ?? "TBD"}
-                team2Name={game.team2?.name ?? "TBD"}
-                scoreTeam1={game.scoreTeam1}
-                scoreTeam2={game.scoreTeam2}
-                setScores={game.setScores as { team1: number; team2: number }[] | null}
-                matchType={game.matchType}
-                status={game.status}
-                scheduledAt={game.scheduledAt}
-                locationName={game.location?.name ?? null}
-                poolName={game.pool?.name ?? null}
+                key={match.id}
+                participant1Name={match.participant1?.name ?? "TBD"}
+                participant2Name={match.participant2?.name ?? "TBD"}
+                scoreParticipant1={match.scoreParticipant1}
+                scoreParticipant2={match.scoreParticipant2}
+                setScores={match.setScores as { team1: number; team2: number }[] | null}
+                matchType={match.matchType}
+                status={match.status}
+                scheduledAt={match.scheduledAt}
+                locationName={match.location?.name ?? null}
               />
             ))}
           </div>

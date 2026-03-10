@@ -4,17 +4,17 @@ import { protectedProcedure, createTRPCRouter } from "../init";
 import { verifyTournamentOwnership } from "../helpers";
 import { fisherYatesShuffle, stripUndefined } from "@/lib/utils";
 
-export const teamsRouter = createTRPCRouter({
+export const participantsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
-      return ctx.prisma.team.findMany({
+      return ctx.prisma.participant.findMany({
         where: { tournamentId: input.tournamentId },
         orderBy: { seed: "asc" },
         include: {
           _count: {
-            select: { gamesAsTeam1: true, gamesAsTeam2: true },
+            select: { matchesAsParticipant1: true, matchesAsParticipant2: true },
           },
         },
       });
@@ -24,11 +24,11 @@ export const teamsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), tournamentId: z.string() }))
     .query(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
-      const team = await ctx.prisma.team.findFirst({
+      const participant = await ctx.prisma.participant.findFirst({
         where: { id: input.id, tournamentId: input.tournamentId },
       });
-      if (!team) throw new TRPCError({ code: "NOT_FOUND" });
-      return team;
+      if (!participant) throw new TRPCError({ code: "NOT_FOUND" });
+      return participant;
     }),
 
   create: protectedProcedure
@@ -44,23 +44,23 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const existing = await ctx.prisma.team.findFirst({
+      const existing = await ctx.prisma.participant.findFirst({
         where: { tournamentId: input.tournamentId, name: input.name },
       });
       if (existing) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "A team with this name already exists in this tournament",
+          message: "A participant with this name already exists in this tournament",
         });
       }
 
       // Auto-assign next seed
-      const maxSeed = await ctx.prisma.team.aggregate({
+      const maxSeed = await ctx.prisma.participant.aggregate({
         where: { tournamentId: input.tournamentId },
         _max: { seed: true },
       });
 
-      return ctx.prisma.team.create({
+      return ctx.prisma.participant.create({
         data: {
           name: input.name,
           captainName: input.captainName || null,
@@ -87,7 +87,7 @@ export const teamsRouter = createTRPCRouter({
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
       if (input.name) {
-        const existing = await ctx.prisma.team.findFirst({
+        const existing = await ctx.prisma.participant.findFirst({
           where: {
             tournamentId: input.tournamentId,
             name: input.name,
@@ -97,7 +97,7 @@ export const teamsRouter = createTRPCRouter({
         if (existing) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "A team with this name already exists in this tournament",
+            message: "A participant with this name already exists in this tournament",
           });
         }
       }
@@ -109,7 +109,7 @@ export const teamsRouter = createTRPCRouter({
         roster: input.roster,
       });
 
-      return ctx.prisma.team.update({
+      return ctx.prisma.participant.update({
         where: { id: input.id },
         data: updateData,
       });
@@ -120,25 +120,25 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const activeGames = await ctx.prisma.game.count({
+      const activeMatches = await ctx.prisma.match.count({
         where: {
-          OR: [{ team1Id: input.id }, { team2Id: input.id }],
-          status: { in: ["SCHEDULED", "IN_PROGRESS"] },
+          OR: [{ participant1Id: input.id }, { participant2Id: input.id }],
+          status: { in: ["PENDING", "OPEN"] },
         },
       });
-      if (activeGames > 0) {
+      if (activeMatches > 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Cannot delete team with active games",
+          message: "Cannot delete participant with active matches",
         });
       }
 
-      const team = await ctx.prisma.team.findFirst({
+      const participant = await ctx.prisma.participant.findFirst({
         where: { id: input.id, tournamentId: input.tournamentId },
       });
-      if (!team) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!participant) throw new TRPCError({ code: "NOT_FOUND" });
 
-      return ctx.prisma.team.delete({ where: { id: input.id } });
+      return ctx.prisma.participant.delete({ where: { id: input.id } });
     }),
 
   bulkCreate: protectedProcedure
@@ -157,26 +157,26 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const existing = await ctx.prisma.team.findMany({
+      const existing = await ctx.prisma.participant.findMany({
         where: { tournamentId: input.tournamentId },
         select: { name: true, seed: true },
       });
       const existingNames = new Set(existing.map((t) => t.name.toLowerCase()));
       const maxSeed = Math.max(0, ...existing.map((t) => t.seed));
 
-      const newTeams = input.teams.filter(
+      const newParticipants = input.teams.filter(
         (t) => !existingNames.has(t.name.toLowerCase())
       );
 
-      if (newTeams.length === 0) {
+      if (newParticipants.length === 0) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "All team names already exist",
+          message: "All participant names already exist",
         });
       }
 
-      await ctx.prisma.team.createMany({
-        data: newTeams.map((t, i) => ({
+      await ctx.prisma.participant.createMany({
+        data: newParticipants.map((t, i) => ({
           name: t.name,
           captainName: t.captainName || null,
           captainEmail: t.captainEmail || null,
@@ -186,22 +186,22 @@ export const teamsRouter = createTRPCRouter({
         })),
       });
 
-      return { created: newTeams.length, skipped: input.teams.length - newTeams.length };
+      return { created: newParticipants.length, skipped: input.teams.length - newParticipants.length };
     }),
 
   updateSeed: protectedProcedure
     .input(
       z.object({
         tournamentId: z.string(),
-        teamId: z.string(),
+        participantId: z.string(),
         seed: z.number().int().min(0),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      return ctx.prisma.team.update({
-        where: { id: input.teamId },
+      return ctx.prisma.participant.update({
+        where: { id: input.participantId },
         data: { seed: input.seed },
       });
     }),
@@ -211,19 +211,21 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const teams = await ctx.prisma.team.findMany({
+      const participants = await ctx.prisma.participant.findMany({
         where: { tournamentId: input.tournamentId },
       });
 
-      const shuffled = fisherYatesShuffle([...teams]);
+      const shuffled = fisherYatesShuffle([...participants]);
 
       await ctx.prisma.$transaction(
-        shuffled.map((t, index) =>
-          ctx.prisma.team.update({
-            where: { id: t.id },
+        shuffled.map((p, index) =>
+          ctx.prisma.participant.update({
+            where: { id: p.id },
             data: { seed: index + 1 },
           })
         )
       );
+
+      return { randomized: shuffled.length };
     }),
 });

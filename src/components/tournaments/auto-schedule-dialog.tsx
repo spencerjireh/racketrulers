@@ -43,10 +43,10 @@ export function AutoScheduleDialog({
   const [clearExisting, setClearExisting] = useState(true);
 
   const autoSchedule = useMutation(
-    trpc.games.autoSchedule.mutationOptions({
+    trpc.matches.autoSchedule.mutationOptions({
       onSuccess: (data) => {
         queryClient.invalidateQueries(
-          trpc.games.listByTournament.queryFilter({ tournamentId })
+          trpc.matches.listByTournament.queryFilter({ tournamentId })
         );
         toast.success(`Scheduled ${data.scheduled} games`);
         onOpenChange(false);

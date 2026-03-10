@@ -4,7 +4,6 @@ import { use, useMemo, useState } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock } from "lucide-react";
-import { RoundsManager } from "@/components/tournaments/rounds-manager";
 import { ScoresManager } from "@/components/tournaments/scores-manager";
 import { ScheduleCalendar } from "@/components/tournaments/schedule-calendar";
 import { BracketView } from "@/components/tournaments/bracket-view";
@@ -28,23 +27,14 @@ export default function TournamentBracketPage({
     trpc.tournaments.getById.queryOptions({ id: tournamentId })
   );
 
-  const { data: rounds } = useQuery(
-    trpc.rounds.list.queryOptions({ tournamentId })
+  const { data: allMatches } = useQuery(
+    trpc.matches.listByTournament.queryOptions({ tournamentId })
   );
 
-  // Find the single-elim round that has games generated
-  const singleElimRound = useMemo(
-    () =>
-      rounds?.find(
-        (r) => r.type === "SINGLE_ELIM" && r._count.games > 0
-      ) ?? null,
-    [rounds]
-  );
+  const isBracketFormat =
+    tournament?.format === "SINGLE_ELIM" || tournament?.format === "DOUBLE_ELIM";
 
-  const totalGames = useMemo(
-    () => rounds?.reduce((sum, r) => sum + r._count.games, 0) ?? 0,
-    [rounds]
-  );
+  const totalMatches = allMatches?.length ?? 0;
 
   const dayCount = useMemo(() => {
     if (!tournament) return 0;
@@ -62,7 +52,7 @@ export default function TournamentBracketPage({
   }
 
   const courtCount = tournament.locations?.length ?? 0;
-  const defaultTab = singleElimRound ? "bracket" : "rounds";
+  const defaultTab = isBracketFormat && totalMatches > 0 ? "bracket" : "scores";
 
   return (
     <div className="space-y-6">
@@ -71,7 +61,7 @@ export default function TournamentBracketPage({
           variant="outline"
           size="sm"
           onClick={() => setAutoScheduleOpen(true)}
-          disabled={totalGames === 0 || courtCount === 0}
+          disabled={totalMatches === 0 || courtCount === 0}
         >
           <CalendarClock className="mr-2 h-4 w-4" />
           Auto Schedule
@@ -83,25 +73,23 @@ export default function TournamentBracketPage({
         onOpenChange={setAutoScheduleOpen}
         tournamentId={tournamentId}
         courtCount={courtCount}
-        gameCount={totalGames}
+        gameCount={totalMatches}
         dayCount={dayCount}
       />
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>
-          {singleElimRound && (
+          {isBracketFormat && totalMatches > 0 && (
             <TabsTrigger value="bracket">Bracket</TabsTrigger>
           )}
-          <TabsTrigger value="rounds">Rounds</TabsTrigger>
           <TabsTrigger value="scores">Scores</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
         </TabsList>
 
-        {singleElimRound && (
+        {isBracketFormat && totalMatches > 0 && (
           <TabsContent value="bracket" className="mt-4">
             <BracketView
               tournamentId={tournamentId}
-              roundId={singleElimRound.id}
               interactive
               scoringConfig={
                 tournament.scoringConfig as {
@@ -114,10 +102,6 @@ export default function TournamentBracketPage({
             />
           </TabsContent>
         )}
-
-        <TabsContent value="rounds" className="mt-4">
-          <RoundsManager tournamentId={tournamentId} />
-        </TabsContent>
 
         <TabsContent value="scores" className="mt-4">
           <ScoresManager tournamentId={tournamentId} />

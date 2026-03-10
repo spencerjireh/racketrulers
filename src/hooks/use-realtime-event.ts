@@ -13,24 +13,24 @@ export function useRealtimeTournament(tournamentId: string) {
   useEffect(() => {
     const unsub1 = on("score:updated", () => {
       queryClient.invalidateQueries(
-        trpc.games.listByTournament.queryFilter({ tournamentId })
+        trpc.matches.listByTournament.queryFilter({ tournamentId })
       );
       queryClient.invalidateQueries(
-        trpc.games.listByTournamentPublic.queryFilter({ tournamentId })
+        trpc.matches.listByTournamentPublic.queryFilter({ tournamentId })
       );
-      // Invalidate all standings queries (any roundId)
-      queryClient.invalidateQueries({ queryKey: [["games", "getStandings"]] });
+      // Invalidate all standings queries (any tournamentId)
+      queryClient.invalidateQueries({ queryKey: [["matches", "getStandings"]] });
       // Invalidate bracket data queries
-      queryClient.invalidateQueries({ queryKey: [["games", "getBracketData"]] });
-      queryClient.invalidateQueries({ queryKey: [["games", "getBracketDataPublic"]] });
+      queryClient.invalidateQueries({ queryKey: [["matches", "getBracketData"]] });
+      queryClient.invalidateQueries({ queryKey: [["matches", "getBracketDataPublic"]] });
     });
 
     const unsub2 = on("schedule:updated", () => {
       queryClient.invalidateQueries(
-        trpc.games.listByTournament.queryFilter({ tournamentId })
+        trpc.matches.listByTournament.queryFilter({ tournamentId })
       );
       queryClient.invalidateQueries(
-        trpc.games.listByTournamentPublic.queryFilter({ tournamentId })
+        trpc.matches.listByTournamentPublic.queryFilter({ tournamentId })
       );
     });
 

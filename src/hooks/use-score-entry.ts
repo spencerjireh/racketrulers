@@ -34,12 +34,12 @@ export function useScoreEntry(
   const invalidate = useCallback(() => {
     invalidateKeys();
     queryClient.invalidateQueries(
-      trpc.games.listByTournament.queryFilter({ tournamentId })
+      trpc.matches.listByTournament.queryFilter({ tournamentId })
     );
   }, [queryClient, trpc, tournamentId, invalidateKeys]);
 
   const updateScore = useMutation(
-    trpc.games.updateScore.mutationOptions({
+    trpc.matches.updateScore.mutationOptions({
       onSuccess: () => {
         invalidate();
         setScoringGameId(null);
@@ -64,7 +64,7 @@ export function useScoreEntry(
   );
 
   const updateStatus = useMutation(
-    trpc.games.updateStatus.mutationOptions({
+    trpc.matches.updateStatus.mutationOptions({
       onSuccess: () => {
         invalidate();
         setScoringGameId(null);
@@ -75,7 +75,7 @@ export function useScoreEntry(
   );
 
   const resetScore = useMutation(
-    trpc.games.resetScore.mutationOptions({
+    trpc.matches.resetScore.mutationOptions({
       onSuccess: () => {
         invalidate();
         setCascadeInfo(null);
@@ -114,14 +114,6 @@ export function useScoreEntry(
     });
   }
 
-  function submitCancel(gameId: string) {
-    updateStatus.mutate({
-      id: gameId,
-      tournamentId,
-      status: "CANCELLED",
-    });
-  }
-
   function submitReset(gameId: string) {
     setPendingResetGameId(gameId);
     resetScore.mutate({ id: gameId, tournamentId });
@@ -152,7 +144,6 @@ export function useScoreEntry(
     setCascadeInfo,
     submitScore,
     submitForfeit,
-    submitCancel,
     submitReset,
     confirmCascade,
     isPending: updateScore.isPending || updateStatus.isPending,

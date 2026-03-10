@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { SetScore } from "@/server/lib/scoring-validation";
 
-interface TeamInfo {
+interface ParticipantInfo {
   id: string;
   name: string;
   seed: number;
@@ -17,10 +17,10 @@ interface TeamInfo {
 export interface MatchCardGame {
   id: string;
   status: string;
-  team1: TeamInfo | null;
-  team2: TeamInfo | null;
-  scoreTeam1: number | null;
-  scoreTeam2: number | null;
+  participant1: ParticipantInfo | null;
+  participant2: ParticipantInfo | null;
+  scoreParticipant1: number | null;
+  scoreParticipant2: number | null;
   setScores: SetScore[] | null;
   location: { id: string; name: string } | null;
   scheduledAt: Date | string | null;
@@ -34,30 +34,30 @@ interface MatchCardProps {
 }
 
 function isBye(game: MatchCardGame) {
-  return (game.team1 === null) !== (game.team2 === null);
+  return (game.participant1 === null) !== (game.participant2 === null);
 }
 
 function getWinnerId(game: MatchCardGame): string | null {
-  if (game.status !== "COMPLETED" && game.status !== "FORFEIT") return null;
-  if (game.scoreTeam1 != null && game.scoreTeam2 != null) {
-    if (game.scoreTeam1 > game.scoreTeam2) return game.team1?.id ?? null;
-    if (game.scoreTeam2 > game.scoreTeam1) return game.team2?.id ?? null;
+  if (game.status !== "COMPLETE" && game.status !== "FORFEIT") return null;
+  if (game.scoreParticipant1 != null && game.scoreParticipant2 != null) {
+    if (game.scoreParticipant1 > game.scoreParticipant2) return game.participant1?.id ?? null;
+    if (game.scoreParticipant2 > game.scoreParticipant1) return game.participant2?.id ?? null;
   }
   return null;
 }
 
-function TeamRow({
-  team,
+function ParticipantRow({
+  participant,
   score,
   isWinner,
   isLoser,
 }: {
-  team: TeamInfo | null;
+  participant: ParticipantInfo | null;
   score: number | null;
   isWinner: boolean;
   isLoser: boolean;
 }) {
-  if (!team) {
+  if (!participant) {
     return (
       <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground">
         <span className="italic">TBD</span>
@@ -75,9 +75,9 @@ function TeamRow({
     >
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="text-[10px] text-muted-foreground tabular-nums w-4 text-right shrink-0">
-          {team.seed || ""}
+          {participant.seed || ""}
         </span>
-        <span className="text-sm truncate">{team.name}</span>
+        <span className="text-sm truncate">{participant.name}</span>
       </div>
       {score != null && (
         <span className="text-sm font-mono tabular-nums ml-2 shrink-0">{score}</span>
@@ -91,9 +91,9 @@ export function MatchCard({ game, interactive, onScore }: MatchCardProps) {
   const winnerId = getWinnerId(game);
 
   const borderColor =
-    game.status === "COMPLETED" || game.status === "FORFEIT"
+    game.status === "COMPLETE" || game.status === "FORFEIT"
       ? "border-l-primary"
-      : game.status === "IN_PROGRESS"
+      : game.status === "OPEN"
         ? "border-l-amber-500"
         : "border-l-border";
 
@@ -123,18 +123,18 @@ export function MatchCard({ game, interactive, onScore }: MatchCardProps) {
       )}
       onClick={interactive && onScore ? () => onScore(game) : undefined}
     >
-      <TeamRow
-        team={game.team1}
-        score={game.scoreTeam1}
-        isWinner={winnerId === game.team1?.id}
-        isLoser={winnerId != null && winnerId !== game.team1?.id}
+      <ParticipantRow
+        participant={game.participant1}
+        score={game.scoreParticipant1}
+        isWinner={winnerId === game.participant1?.id}
+        isLoser={winnerId != null && winnerId !== game.participant1?.id}
       />
       <div className="border-t border-dashed mx-2" />
-      <TeamRow
-        team={game.team2}
-        score={game.scoreTeam2}
-        isWinner={winnerId === game.team2?.id}
-        isLoser={winnerId != null && winnerId !== game.team2?.id}
+      <ParticipantRow
+        participant={game.participant2}
+        score={game.scoreParticipant2}
+        isWinner={winnerId === game.participant2?.id}
+        isLoser={winnerId != null && winnerId !== game.participant2?.id}
       />
       {game.setScores && game.setScores.length > 0 && !bye && (
         <div className="border-t px-3 py-1 text-center">

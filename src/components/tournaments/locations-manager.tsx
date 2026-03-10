@@ -154,7 +154,7 @@ export function LocationsManager({ tournamentId }: { tournamentId: string }) {
                       </button>
                     )}
                   </TableCell>
-                  <TableCell>{location._count.games}</TableCell>
+                  <TableCell>{location._count.matches}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -162,9 +162,9 @@ export function LocationsManager({ tournamentId }: { tournamentId: string }) {
                       className="text-destructive hover:text-destructive"
                       onClick={() => {
                         if (
-                          location._count.games > 0 &&
+                          location._count.matches > 0 &&
                           !confirm(
-                            `This location has ${location._count.games} game(s) assigned. Delete anyway?`
+                            `This location has ${location._count.matches} game(s) assigned. Delete anyway?`
                           )
                         ) {
                           return;

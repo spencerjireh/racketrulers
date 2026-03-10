@@ -7,12 +7,12 @@ interface TournamentCardProps {
   tournament: {
     id: string;
     name: string;
-    status: "DRAFT" | "PUBLISHED" | "COMPLETED";
+    status: "PENDING" | "UNDERWAY" | "COMPLETE";
     startDate: Date;
     endDate: Date;
     _count: {
-      rounds: number;
-      teams: number;
+      matches: number;
+      participants: number;
       locations: number;
     };
   };
@@ -23,16 +23,16 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
   const end = new Date(tournament.endDate);
 
   const statusLabel =
-    tournament.status === "DRAFT"
-      ? "Draft"
-      : tournament.status === "PUBLISHED"
+    tournament.status === "PENDING"
+      ? "Setup"
+      : tournament.status === "UNDERWAY"
         ? "Active"
         : "Completed";
 
   const statusVariant =
-    tournament.status === "DRAFT"
+    tournament.status === "PENDING"
       ? "outline"
-      : tournament.status === "PUBLISHED"
+      : tournament.status === "UNDERWAY"
         ? "default"
         : "secondary";
 
@@ -54,12 +54,12 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
               {start.toLocaleDateString()} - {end.toLocaleDateString()}
             </p>
             <p>
-              {tournament._count.teams} teams / {tournament._count.locations} courts
+              {tournament._count.participants} participants / {tournament._count.locations} courts
             </p>
           </div>
           <Button asChild size="sm">
             <Link href={`/dashboard/tournaments/${tournament.id}/manage`}>
-              {tournament.status === "DRAFT" ? "Setup" : "Manage"}
+              {tournament.status === "PENDING" ? "Setup" : "Manage"}
             </Link>
           </Button>
         </div>

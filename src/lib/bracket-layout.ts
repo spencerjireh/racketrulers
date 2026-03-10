@@ -3,10 +3,10 @@ export const CARD_HEIGHT = 100; // accounts for set scores row beneath team rows
 export const COL_GAP = 48; // 3rem
 export const ROW_GAP = 24; // 1.5rem between cards
 
-export interface BracketGame {
+export interface BracketMatch {
   id: string;
-  feederGame1Id: string | null;
-  feederGame2Id: string | null;
+  feederMatch1Id: string | null;
+  feederMatch2Id: string | null;
 }
 
 export interface BracketNode {
@@ -41,7 +41,7 @@ export interface BracketLayout {
  * between their two feeder games.
  */
 export function computeBracketLayout(
-  rounds: { index: number; games: BracketGame[] }[]
+  rounds: { index: number; games: BracketMatch[] }[]
 ): BracketLayout {
   if (rounds.length === 0) {
     return { nodes: [], connectors: [], totalCols: 0, totalWidth: 0, totalHeight: 0 };
@@ -69,8 +69,8 @@ export function computeBracketLayout(
     const round = rounds[col];
     for (let i = 0; i < round.games.length; i++) {
       const game = round.games[i];
-      const feeder1 = game.feederGame1Id ? nodeMap.get(game.feederGame1Id) : null;
-      const feeder2 = game.feederGame2Id ? nodeMap.get(game.feederGame2Id) : null;
+      const feeder1 = game.feederMatch1Id ? nodeMap.get(game.feederMatch1Id) : null;
+      const feeder2 = game.feederMatch2Id ? nodeMap.get(game.feederMatch2Id) : null;
 
       let row: number;
       if (feeder1 && feeder2) {
@@ -98,7 +98,7 @@ export function computeBracketLayout(
       const target = nodeMap.get(game.id);
       if (!target) continue;
 
-      for (const feederId of [game.feederGame1Id, game.feederGame2Id]) {
+      for (const feederId of [game.feederMatch1Id, game.feederMatch2Id]) {
         if (!feederId) continue;
         const source = nodeMap.get(feederId);
         if (!source) continue;

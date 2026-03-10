@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { TIMEZONES, DEFAULT_SCHEDULE_CONFIG, type ScheduleConfig } from "@/lib/constants";
 import { type ScoringConfig, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
 
-type TournamentFormat = "ROUND_ROBIN" | "SINGLE_ELIM" | "DOUBLE_ELIM" | "SWISS" | "CUSTOM";
+type TournamentFormat = "ROUND_ROBIN" | "SINGLE_ELIM" | "DOUBLE_ELIM" | "SWISS";
 
 interface TournamentSettingsFormProps {
   tournament: {
@@ -56,7 +56,7 @@ const TIEBREAKER_OPTIONS = [
 export function TournamentSettingsForm({ tournament }: TournamentSettingsFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const isCompleted = tournament.status === "COMPLETED";
+  const isCompleted = tournament.status === "COMPLETE";
 
   const [timezone, setTimezone] = useState(tournament.timezone);
   const [format, setFormat] = useState<TournamentFormat>(tournament.format ?? "ROUND_ROBIN");

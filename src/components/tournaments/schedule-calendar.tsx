@@ -21,11 +21,11 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DEFAULT_SCHEDULE_CONFIG, type ScheduleConfig } from "@/lib/constants";
 
-interface GameItem {
+interface MatchItem {
   id: string;
-  team1: { id: string; name: string } | null;
-  team2: { id: string; name: string } | null;
-  round: { id: string; name: string; type: string };
+  participant1: { id: string; name: string } | null;
+  participant2: { id: string; name: string } | null;
+  round: number | null;
   scheduledAt: Date | string | null;
   locationId: string | null;
   location: { id: string; name: string } | null;
@@ -45,8 +45,8 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
   const { data: tournament } = useQuery(
     trpc.tournaments.getById.queryOptions({ id: tournamentId })
   );
-  const { data: allGames, isLoading: gamesLoading } = useQuery(
-    trpc.games.listByTournament.queryOptions({ tournamentId })
+  const { data: allMatches, isLoading: matchesLoading } = useQuery(
+    trpc.matches.listByTournament.queryOptions({ tournamentId })
   );
   const { data: locations } = useQuery(
     trpc.locations.list.queryOptions({ tournamentId })
@@ -54,7 +54,7 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
 
   const scheduleConfig = (tournament?.scheduleConfig ?? DEFAULT_SCHEDULE_CONFIG) as ScheduleConfig;
 
-  // Local state for drag-and-drop changes (gameId -> assignment)
+  // Local state for drag-and-drop changes (matchId -> assignment)
   const [localChanges, setLocalChanges] = useState<Record<string, LocalAssignment>>({});
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -77,14 +77,14 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
 
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
-  // Get effective game data (merging local changes)
-  const getEffectiveGame = useCallback(
-    (game: GameItem) => {
-      const local = localChanges[game.id];
-      const effectiveScheduledAt = local?.scheduledAt ?? (game.scheduledAt ? new Date(game.scheduledAt).toISOString() : null);
-      const effectiveLocationId = local?.locationId ?? game.locationId;
+  // Get effective match data (merging local changes)
+  const getEffectiveMatch = useCallback(
+    (match: MatchItem) => {
+      const local = localChanges[match.id];
+      const effectiveScheduledAt = local?.scheduledAt ?? (match.scheduledAt ? new Date(match.scheduledAt).toISOString() : null);
+      const effectiveLocationId = local?.locationId ?? match.locationId;
       return {
-        ...game,
+        ...match,
         effectiveScheduledAt,
         effectiveLocationId,
       };
@@ -92,32 +92,32 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
     [localChanges]
   );
 
-  // Pre-compute game lookup by cell key for O(1) access per cell
-  const gameByCellKey = useMemo(() => {
-    if (!allGames || tournamentDays.length === 0) return new Map<string, ReturnType<typeof getEffectiveGame>>();
+  // Pre-compute match lookup by cell key for O(1) access per cell
+  const matchByCellKey = useMemo(() => {
+    if (!allMatches || tournamentDays.length === 0) return new Map<string, ReturnType<typeof getEffectiveMatch>>();
     const day = tournamentDays[selectedDayIndex];
-    if (!day) return new Map<string, ReturnType<typeof getEffectiveGame>>();
+    if (!day) return new Map<string, ReturnType<typeof getEffectiveMatch>>();
 
     const dayStart = new Date(day);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(day);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const map = new Map<string, ReturnType<typeof getEffectiveGame>>();
-    for (const game of allGames) {
-      const g = getEffectiveGame(game);
-      if (!g.effectiveScheduledAt || !g.effectiveLocationId) continue;
-      const d = new Date(g.effectiveScheduledAt);
+    const map = new Map<string, ReturnType<typeof getEffectiveMatch>>();
+    for (const match of allMatches) {
+      const m = getEffectiveMatch(match as unknown as MatchItem);
+      if (!m.effectiveScheduledAt || !m.effectiveLocationId) continue;
+      const d = new Date(m.effectiveScheduledAt);
       if (d < dayStart || d > dayEnd) continue;
       const totalMin = d.getHours() * 60 + d.getMinutes();
       const slotIndex = Math.floor(
         (totalMin - scheduleConfig.dayStartHour * 60) / scheduleConfig.slotDuration
       );
-      const key = `${g.effectiveLocationId}-${slotIndex}`;
-      map.set(key, g);
+      const key = `${m.effectiveLocationId}-${slotIndex}`;
+      map.set(key, m);
     }
     return map;
-  }, [allGames, tournamentDays, selectedDayIndex, getEffectiveGame, scheduleConfig]);
+  }, [allMatches, tournamentDays, selectedDayIndex, getEffectiveMatch, scheduleConfig]);
 
   // Time slots for the grid
   const timeSlots = useMemo(() => {
@@ -133,14 +133,14 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
     return slots;
   }, [scheduleConfig]);
 
-  // Unscheduled games (no scheduledAt and no local assignment)
-  const unscheduledGames = useMemo(() => {
-    if (!allGames) return [];
-    return allGames.filter((g) => {
-      const local = localChanges[g.id];
-      return !local && !g.scheduledAt;
+  // Unscheduled matches (no scheduledAt and no local assignment)
+  const unscheduledMatches = useMemo(() => {
+    if (!allMatches) return [];
+    return allMatches.filter((m) => {
+      const local = localChanges[m.id];
+      return !local && !m.scheduledAt;
     });
-  }, [allGames, localChanges]);
+  }, [allMatches, localChanges]);
 
   // DnD
   const sensors = useSensors(
@@ -156,7 +156,7 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
     const { active, over } = event;
     if (!over || !tournamentDays[selectedDayIndex]) return;
 
-    const gameId = active.id as string;
+    const matchId = active.id as string;
     // over.id format: "slot-{slotIndex}-{locationId}"
     const parts = (over.id as string).split("-");
     if (parts[0] !== "slot" || parts.length < 3) return;
@@ -176,7 +176,7 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
 
     setLocalChanges((prev) => ({
       ...prev,
-      [gameId]: {
+      [matchId]: {
         scheduledAt: scheduledAt.toISOString(),
         locationId,
       },
@@ -184,10 +184,10 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
   }
 
   const batchUpdate = useMutation(
-    trpc.games.batchUpdateSchedule.mutationOptions({
+    trpc.matches.batchUpdateSchedule.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(
-          trpc.games.listByTournament.queryFilter({ tournamentId })
+          trpc.matches.listByTournament.queryFilter({ tournamentId })
         );
         setLocalChanges({});
         toast.success("Schedule saved");
@@ -197,8 +197,8 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
   );
 
   function handleSave() {
-    const updates = Object.entries(localChanges).map(([gameId, assignment]) => ({
-      gameId,
+    const updates = Object.entries(localChanges).map(([matchId, assignment]) => ({
+      matchId,
       scheduledAt: assignment.scheduledAt,
       locationId: assignment.locationId,
     }));
@@ -209,10 +209,10 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
     batchUpdate.mutate({ tournamentId, updates });
   }
 
-  const activeGame = allGames?.find((g) => g.id === activeDragId);
+  const activeMatch = allMatches?.find((m) => m.id === activeDragId);
   const hasChanges = Object.keys(localChanges).length > 0;
 
-  if (gamesLoading) {
+  if (matchesLoading) {
     return <LoadingState text="Loading schedule..." />;
   }
 
@@ -221,19 +221,19 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
       <Card>
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">
-            Add courts in the Details step first before scheduling games.
+            Add courts in the Settings tab first before scheduling matches.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  if (!allGames || allGames.length === 0) {
+  if (!allMatches || allMatches.length === 0) {
     return (
       <Card>
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">
-            No games generated yet. Generate games in the Rounds step first.
+            No matches generated yet. Start the tournament to generate matches.
           </p>
         </CardContent>
       </Card>
@@ -288,18 +288,18 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
         </div>
 
         <div className="flex gap-4">
-          {/* Unscheduled games sidebar */}
+          {/* Unscheduled matches sidebar */}
           <div className="w-56 shrink-0 space-y-2">
             <h3 className="text-sm font-medium">
-              Unscheduled ({unscheduledGames.length})
+              Unscheduled ({unscheduledMatches.length})
             </h3>
             <div className="space-y-1 max-h-[600px] overflow-y-auto">
-              {unscheduledGames.map((game) => (
-                <DraggableGameCard key={game.id} game={game} />
+              {(unscheduledMatches as unknown as MatchItem[]).map((match) => (
+                <DraggableMatchCard key={match.id} match={match} />
               ))}
-              {unscheduledGames.length === 0 && (
+              {unscheduledMatches.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  All games scheduled
+                  All matches scheduled
                 </p>
               )}
             </div>
@@ -336,16 +336,16 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
                   </div>
                   {locations.map((loc) => {
                     const cellId = `slot-${slotIndex}-${loc.id}`;
-                    const gameInCell = gameByCellKey.get(`${loc.id}-${slotIndex}`);
+                    const matchInCell = matchByCellKey.get(`${loc.id}-${slotIndex}`);
 
                     return (
                       <DroppableCell
                         key={cellId}
                         cellId={cellId}
-                        hasGame={!!gameInCell}
+                        hasMatch={!!matchInCell}
                       >
-                        {gameInCell && (
-                          <DraggableGameCard game={gameInCell} compact />
+                        {matchInCell && (
+                          <DraggableMatchCard match={matchInCell} compact />
                         )}
                       </DroppableCell>
                     );
@@ -359,23 +359,23 @@ export function ScheduleCalendar({ tournamentId }: { tournamentId: string }) {
 
       {/* Drag overlay */}
       <DragOverlay>
-        {activeGame ? (
-          <GameCardContent game={activeGame} compact={false} />
+        {activeMatch ? (
+          <MatchCardContent match={activeMatch as unknown as MatchItem} compact={false} />
         ) : null}
       </DragOverlay>
     </DndContext>
   );
 }
 
-function DraggableGameCard({
-  game,
+function DraggableMatchCard({
+  match,
   compact,
 }: {
-  game: GameItem;
+  match: MatchItem;
   compact?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: game.id,
+    id: match.id,
   });
 
   return (
@@ -385,27 +385,27 @@ function DraggableGameCard({
       {...attributes}
       className={cn(isDragging && "opacity-30")}
     >
-      <GameCardContent game={game} compact={compact} />
+      <MatchCardContent match={match} compact={compact} />
     </div>
   );
 }
 
-function GameCardContent({
-  game,
+function MatchCardContent({
+  match,
   compact,
 }: {
-  game: GameItem;
+  match: MatchItem;
   compact?: boolean;
 }) {
-  const t1 = game.team1?.name ?? "TBD";
-  const t2 = game.team2?.name ?? "TBD";
+  const p1 = match.participant1?.name ?? "TBD";
+  const p2 = match.participant2?.name ?? "TBD";
 
   if (compact) {
     return (
       <div className="rounded bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[10px] cursor-grab select-none truncate">
-        <span className="font-medium">{t1}</span>
+        <span className="font-medium">{p1}</span>
         <span className="text-muted-foreground"> v </span>
-        <span className="font-medium">{t2}</span>
+        <span className="font-medium">{p2}</span>
       </div>
     );
   }
@@ -413,11 +413,13 @@ function GameCardContent({
   return (
     <div className="rounded border bg-card px-2 py-1.5 text-xs cursor-grab select-none shadow-sm">
       <div className="font-medium truncate">
-        {t1} vs {t2}
+        {p1} vs {p2}
       </div>
-      <div className="text-[10px] text-muted-foreground truncate">
-        {game.round.name}
-      </div>
+      {match.round !== null && (
+        <div className="text-[10px] text-muted-foreground truncate">
+          Round {match.round}
+        </div>
+      )}
     </div>
   );
 }
@@ -425,11 +427,11 @@ function GameCardContent({
 function DroppableCell({
   cellId,
   children,
-  hasGame,
+  hasMatch,
 }: {
   cellId: string;
   children?: React.ReactNode;
-  hasGame: boolean;
+  hasMatch: boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: cellId });
 
@@ -438,8 +440,8 @@ function DroppableCell({
       ref={setNodeRef}
       className={cn(
         "border-b border-l min-h-[32px] p-0.5 transition-colors",
-        isOver && !hasGame && "bg-primary/10",
-        isOver && hasGame && "bg-destructive/10"
+        isOver && !hasMatch && "bg-primary/10",
+        isOver && hasMatch && "bg-destructive/10"
       )}
     >
       {children}

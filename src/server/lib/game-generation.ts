@@ -1,10 +1,9 @@
 import { fisherYatesShuffle } from "@/lib/utils";
 
-interface GameSeed {
-  team1Id: string | null;
-  team2Id: string | null;
+interface MatchSeed {
+  participant1Id: string | null;
+  participant2Id: string | null;
   roundPosition: number;
-  poolId: string | null;
   feederGame1Id?: string;
   feederGame2Id?: string;
   /** Positional index into the returned array -- the game whose winner feeds into team1 */
@@ -22,9 +21,8 @@ interface GameSeed {
  * Handles odd team count by adding a BYE placeholder (games with BYE are skipped).
  */
 export function generateRoundRobinGames(
-  poolId: string,
   teamIds: string[]
-): GameSeed[] {
+): MatchSeed[] {
   if (teamIds.length < 2) return [];
 
   const teams = [...teamIds];
@@ -32,7 +30,7 @@ export function generateRoundRobinGames(
   if (hasBye) teams.push("BYE");
 
   const n = teams.length;
-  const games: GameSeed[] = [];
+  const games: MatchSeed[] = [];
   let position = 1;
 
   for (let round = 0; round < n - 1; round++) {
@@ -43,10 +41,9 @@ export function generateRoundRobinGames(
       if (home === "BYE" || away === "BYE") continue;
 
       games.push({
-        team1Id: home,
-        team2Id: away,
+        participant1Id: home,
+        participant2Id: away,
         roundPosition: position++,
-        poolId,
       });
     }
 
@@ -66,7 +63,7 @@ export function generateRoundRobinGames(
 export function generateSingleElimGames(
   teamIds: string[],
   consolation: boolean = false
-): GameSeed[] {
+): MatchSeed[] {
   if (teamIds.length < 2) return [];
 
   const n = teamIds.length;
@@ -75,7 +72,7 @@ export function generateSingleElimGames(
 
   // Create seeded matchups for first round
   const firstRoundMatchups = createSeededMatchups(bracketSize);
-  const games: GameSeed[] = [];
+  const games: MatchSeed[] = [];
   let position = 1;
 
   // Track games per round for feeder linking
@@ -90,10 +87,9 @@ export function generateSingleElimGames(
 
     firstRound.push({ position, index: games.length });
     games.push({
-      team1Id: t1,
-      team2Id: t2,
+      participant1Id: t1,
+      participant2Id: t2,
       roundPosition: position++,
-      poolId: null,
       bracketRound: 0,
     });
   }
@@ -113,22 +109,21 @@ export function generateSingleElimGames(
       // Check if either feeder is a bye game (auto-advance the non-null team)
       const feeder1Game = games[feeder1.index];
       const feeder2Game = games[feeder2.index];
-      const auto1 = feeder1Game.team1Id === null
-        ? feeder1Game.team2Id
-        : feeder1Game.team2Id === null
-          ? feeder1Game.team1Id
+      const auto1 = feeder1Game.participant1Id === null
+        ? feeder1Game.participant2Id
+        : feeder1Game.participant2Id === null
+          ? feeder1Game.participant1Id
           : null;
-      const auto2 = feeder2Game.team1Id === null
-        ? feeder2Game.team2Id
-        : feeder2Game.team2Id === null
-          ? feeder2Game.team1Id
+      const auto2 = feeder2Game.participant1Id === null
+        ? feeder2Game.participant2Id
+        : feeder2Game.participant2Id === null
+          ? feeder2Game.participant1Id
           : null;
 
       games.push({
-        team1Id: auto1,
-        team2Id: auto2,
+        participant1Id: auto1,
+        participant2Id: auto2,
         roundPosition: position++,
-        poolId: null,
         feederIndex1: feeder1.index,
         feederIndex2: feeder2.index,
         bracketRound: round,
@@ -145,10 +140,9 @@ export function generateSingleElimGames(
       const semiRound = roundGames.get(totalRounds - 2);
       if (semiRound && semiRound.length === 2) {
         games.push({
-          team1Id: null,
-          team2Id: null,
+          participant1Id: null,
+          participant2Id: null,
           roundPosition: position++,
-          poolId: null,
         });
       }
     }
@@ -164,14 +158,14 @@ export function generateSingleElimGames(
 export function generateDoubleElimGames(
   teamIds: string[],
   resetMatch: boolean = true
-): GameSeed[] {
+): MatchSeed[] {
   if (teamIds.length < 2) return [];
 
   const n = teamIds.length;
   const bracketSize = nextPowerOf2(n);
   const wbRounds = Math.log2(bracketSize);
 
-  const games: GameSeed[] = [];
+  const games: MatchSeed[] = [];
   let position = 1;
 
   // --- Winners Bracket ---
@@ -185,10 +179,9 @@ export function generateDoubleElimGames(
     const t2 = seed2 <= n ? teamIds[seed2 - 1] : null;
     wbR1Indices.push(games.length);
     games.push({
-      team1Id: t1,
-      team2Id: t2,
+      participant1Id: t1,
+      participant2Id: t2,
       roundPosition: position++,
-      poolId: null,
       bracketType: "winners",
     });
   }
@@ -202,14 +195,13 @@ export function generateDoubleElimGames(
       const g1 = games[prev[i]];
       const g2 = games[prev[i + 1]];
       // Auto-advance byes
-      const auto1 = g1.team1Id === null ? g1.team2Id : g1.team2Id === null ? g1.team1Id : null;
-      const auto2 = g2.team1Id === null ? g2.team2Id : g2.team2Id === null ? g2.team1Id : null;
+      const auto1 = g1.participant1Id === null ? g1.participant2Id : g1.participant2Id === null ? g1.participant1Id : null;
+      const auto2 = g2.participant1Id === null ? g2.participant2Id : g2.participant2Id === null ? g2.participant1Id : null;
       indices.push(games.length);
       games.push({
-        team1Id: auto1,
-        team2Id: auto2,
+        participant1Id: auto1,
+        participant2Id: auto2,
         roundPosition: position++,
-        poolId: null,
         bracketType: "winners",
       });
     }
@@ -227,10 +219,9 @@ export function generateDoubleElimGames(
   for (let i = 0; i < wbR1.length; i += 2) {
     lbR1Indices.push(games.length);
     games.push({
-      team1Id: null, // loser of WB game
-      team2Id: null, // loser of WB game
+      participant1Id: null, // loser of WB game
+      participant2Id: null, // loser of WB game
       roundPosition: position++,
-      poolId: null,
       bracketType: "losers",
     });
   }
@@ -249,10 +240,9 @@ export function generateDoubleElimGames(
     for (let i = 0; i < numDropMatches; i++) {
       dropIndices.push(games.length);
       games.push({
-        team1Id: null, // LB survivor
-        team2Id: null, // WB loser dropping down
+        participant1Id: null, // LB survivor
+        participant2Id: null, // WB loser dropping down
         roundPosition: position++,
-        poolId: null,
         bracketType: "losers",
       });
     }
@@ -265,10 +255,9 @@ export function generateDoubleElimGames(
       for (let i = 0; i < dropIndices.length; i += 2) {
         elimIndices.push(games.length);
         games.push({
-          team1Id: null,
-          team2Id: null,
+          participant1Id: null,
+          participant2Id: null,
           roundPosition: position++,
-          poolId: null,
           bracketType: "losers",
         });
       }
@@ -279,20 +268,18 @@ export function generateDoubleElimGames(
 
   // --- Grand Finals ---
   games.push({
-    team1Id: null, // WB champion
-    team2Id: null, // LB champion
+    participant1Id: null, // WB champion
+    participant2Id: null, // LB champion
     roundPosition: position++,
-    poolId: null,
     bracketType: "grand_finals",
   });
 
   // Optional reset match
   if (resetMatch) {
     games.push({
-      team1Id: null,
-      team2Id: null,
+      participant1Id: null,
+      participant2Id: null,
       roundPosition: position++,
-      poolId: null,
       bracketType: "grand_finals",
     });
   }
@@ -308,10 +295,10 @@ export function generateDoubleElimGames(
 export function generateSwissPairings(
   teamIds: string[],
   previousResults?: { teamId: string; wins: number; losses: number }[]
-): GameSeed[] {
+): MatchSeed[] {
   if (teamIds.length < 2) return [];
 
-  const games: GameSeed[] = [];
+  const games: MatchSeed[] = [];
   let position = 1;
 
   if (!previousResults || previousResults.length === 0) {
@@ -319,10 +306,9 @@ export function generateSwissPairings(
     const shuffled = fisherYatesShuffle([...teamIds]);
     for (let i = 0; i < shuffled.length - 1; i += 2) {
       games.push({
-        team1Id: shuffled[i],
-        team2Id: shuffled[i + 1],
+        participant1Id: shuffled[i],
+        participant2Id: shuffled[i + 1],
         roundPosition: position++,
-        poolId: null,
       });
     }
     // If odd number, last team gets a bye (no game created)
@@ -339,10 +325,9 @@ export function generateSwissPairings(
         paired.add(sorted[i].teamId);
         paired.add(sorted[j].teamId);
         games.push({
-          team1Id: sorted[i].teamId,
-          team2Id: sorted[j].teamId,
+          participant1Id: sorted[i].teamId,
+          participant2Id: sorted[j].teamId,
           roundPosition: position++,
-          poolId: null,
         });
         break;
       }

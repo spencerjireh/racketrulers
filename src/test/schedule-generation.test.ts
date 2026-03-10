@@ -2,20 +2,20 @@ import { describe, it, expect } from "vitest";
 import {
   generateSchedule,
   type AutoScheduleConfig,
-  type ScheduleGameInput,
+  type ScheduleMatchInput,
 } from "@/server/lib/schedule-generation";
 
 function makeGame(
   id: string,
-  overrides: Partial<ScheduleGameInput> = {}
-): ScheduleGameInput {
+  overrides: Partial<ScheduleMatchInput> = {}
+): ScheduleMatchInput {
   return {
     id,
-    team1Id: `team-${id}-1`,
-    team2Id: `team-${id}-2`,
-    status: "SCHEDULED",
-    feederGame1Id: null,
-    feederGame2Id: null,
+    participant1Id: `team-${id}-1`,
+    participant2Id: `team-${id}-2`,
+    status: "PENDING",
+    feederMatch1Id: null,
+    feederMatch2Id: null,
     ...overrides,
   };
 }
@@ -52,13 +52,13 @@ describe("generateSchedule", () => {
   it("respects feeder ordering -- downstream games come after feeders", () => {
     // Simulate a 4-team single elim: 2 semis feed 1 final
     const games = [
-      makeGame("sf1", { team1Id: "t1", team2Id: "t2" }),
-      makeGame("sf2", { team1Id: "t3", team2Id: "t4" }),
+      makeGame("sf1", { participant1Id: "t1", participant2Id: "t2" }),
+      makeGame("sf2", { participant1Id: "t3", participant2Id: "t4" }),
       makeGame("final", {
-        team1Id: null,
-        team2Id: null,
-        feederGame1Id: "sf1",
-        feederGame2Id: "sf2",
+        participant1Id: null,
+        participant2Id: null,
+        feederMatch1Id: "sf1",
+        feederMatch2Id: "sf2",
       }),
     ];
     const config = makeConfig({ courts: [{ id: "c1", name: "Court 1" }] });
@@ -70,13 +70,13 @@ describe("generateSchedule", () => {
     expect(result.assignments).toHaveLength(3);
 
     const sf1Time = new Date(
-      result.assignments.find((a) => a.gameId === "sf1")!.scheduledAt
+      result.assignments.find((a) => a.matchId === "sf1")!.scheduledAt
     ).getTime();
     const sf2Time = new Date(
-      result.assignments.find((a) => a.gameId === "sf2")!.scheduledAt
+      result.assignments.find((a) => a.matchId === "sf2")!.scheduledAt
     ).getTime();
     const finalTime = new Date(
-      result.assignments.find((a) => a.gameId === "final")!.scheduledAt
+      result.assignments.find((a) => a.matchId === "final")!.scheduledAt
     ).getTime();
 
     expect(finalTime).toBeGreaterThan(sf1Time);
@@ -86,8 +86,8 @@ describe("generateSchedule", () => {
   it("prevents same team from playing in the same time slot", () => {
     // Two games share team "shared-t": team conflict
     const games = [
-      makeGame("g1", { team1Id: "shared-t", team2Id: "t2" }),
-      makeGame("g2", { team1Id: "shared-t", team2Id: "t3" }),
+      makeGame("g1", { participant1Id: "shared-t", participant2Id: "t2" }),
+      makeGame("g2", { participant1Id: "shared-t", participant2Id: "t3" }),
     ];
     const config = makeConfig();
 
@@ -96,8 +96,8 @@ describe("generateSchedule", () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
 
-    const g1 = result.assignments.find((a) => a.gameId === "g1")!;
-    const g2 = result.assignments.find((a) => a.gameId === "g2")!;
+    const g1 = result.assignments.find((a) => a.matchId === "g1")!;
+    const g2 = result.assignments.find((a) => a.matchId === "g2")!;
     // They should be at different times
     expect(g1.scheduledAt).not.toBe(g2.scheduledAt);
   });
@@ -144,9 +144,9 @@ describe("generateSchedule", () => {
   it("excludes completed bye games from scheduling", () => {
     const games = [
       makeGame("bye", {
-        team1Id: "t1",
-        team2Id: null,
-        status: "COMPLETED",
+        participant1Id: "t1",
+        participant2Id: null,
+        status: "COMPLETE",
       }),
       makeGame("real", { team1Id: "t2", team2Id: "t3" }),
     ];
@@ -158,7 +158,7 @@ describe("generateSchedule", () => {
     if (!result.success) return;
     // Only the non-bye game should be scheduled
     expect(result.assignments).toHaveLength(1);
-    expect(result.assignments[0].gameId).toBe("real");
+    expect(result.assignments[0].matchId).toBe("real");
   });
 
   it("returns error with no courts", () => {
@@ -178,8 +178,8 @@ describe("generateSchedule", () => {
   it("returns empty assignments for zero schedulable games", () => {
     // All games are completed byes
     const games = [
-      makeGame("bye1", { team1Id: "t1", team2Id: null, status: "COMPLETED" }),
-      makeGame("bye2", { team1Id: null, team2Id: "t2", status: "COMPLETED" }),
+      makeGame("bye1", { participant1Id: "t1", participant2Id: null, status: "COMPLETE" }),
+      makeGame("bye2", { participant1Id: null, participant2Id: "t2", status: "COMPLETE" }),
     ];
 
     const result = generateSchedule(games, makeConfig());

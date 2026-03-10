@@ -11,18 +11,11 @@ export default async function PublicBracketPage({
   const caller = await createServerCaller();
   const tournament = await caller.tournaments.getBySlug({ slug });
 
-  // Find single-elim round with games
-  const singleElimRound = tournament.rounds.find(
-    (r) => r.type === "SINGLE_ELIM" && r._count.games > 0
-  );
+  const isBracketFormat =
+    tournament.format === "SINGLE_ELIM" || tournament.format === "DOUBLE_ELIM";
 
-  if (singleElimRound) {
-    return (
-      <PublicBracketClient
-        tournamentId={tournament.id}
-        roundId={singleElimRound.id}
-      />
-    );
+  if (isBracketFormat && tournament.status !== "PENDING") {
+    return <PublicBracketClient tournamentId={tournament.id} />;
   }
 
   return <PublicScheduleView tournamentId={tournament.id} />;

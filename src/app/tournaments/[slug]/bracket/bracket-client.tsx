@@ -5,19 +5,10 @@ import { useRealtimeTournament } from "@/hooks/use-realtime-event";
 
 interface PublicBracketClientProps {
   tournamentId: string;
-  roundId: string;
 }
 
-export function PublicBracketClient({
-  tournamentId,
-  roundId,
-}: PublicBracketClientProps) {
+export function PublicBracketClient({ tournamentId }: PublicBracketClientProps) {
   useRealtimeTournament(tournamentId);
 
-  return (
-    <BracketView
-      tournamentId={tournamentId}
-      roundId={roundId}
-    />
-  );
+  return <BracketView tournamentId={tournamentId} />;
 }

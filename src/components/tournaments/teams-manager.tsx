@@ -42,49 +42,49 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
     roster: unknown;
   } | null>(null);
 
-  const { data: teams, isLoading } = useQuery(
-    trpc.teams.list.queryOptions({ tournamentId })
+  const { data: participants, isLoading } = useQuery(
+    trpc.participants.list.queryOptions({ tournamentId })
   );
 
-  const createTeam = useMutation(
-    trpc.teams.create.mutationOptions({
+  const createParticipant = useMutation(
+    trpc.participants.create.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.teams.list.queryFilter({ tournamentId }));
+        queryClient.invalidateQueries(trpc.participants.list.queryFilter({ tournamentId }));
         setShowForm(false);
-        toast.success("Team added");
+        toast.success("Participant added");
       },
       onError: (err) => toast.error(err.message),
     })
   );
 
-  const updateTeam = useMutation(
-    trpc.teams.update.mutationOptions({
+  const updateParticipant = useMutation(
+    trpc.participants.update.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.teams.list.queryFilter({ tournamentId }));
+        queryClient.invalidateQueries(trpc.participants.list.queryFilter({ tournamentId }));
         setEditingTeam(null);
-        toast.success("Team updated");
+        toast.success("Participant updated");
       },
       onError: (err) => toast.error(err.message),
     })
   );
 
-  const deleteTeam = useMutation(
-    trpc.teams.delete.mutationOptions({
+  const deleteParticipant = useMutation(
+    trpc.participants.delete.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.teams.list.queryFilter({ tournamentId }));
-        toast.success("Team deleted");
+        queryClient.invalidateQueries(trpc.participants.list.queryFilter({ tournamentId }));
+        toast.success("Participant deleted");
       },
       onError: (err) => toast.error(err.message),
     })
   );
 
   const bulkCreate = useMutation(
-    trpc.teams.bulkCreate.mutationOptions({
+    trpc.participants.bulkCreate.mutationOptions({
       onSuccess: (result) => {
-        queryClient.invalidateQueries(trpc.teams.list.queryFilter({ tournamentId }));
+        queryClient.invalidateQueries(trpc.participants.list.queryFilter({ tournamentId }));
         setShowBulk(false);
         toast.success(
-          `${result.created} team(s) added${result.skipped > 0 ? `, ${result.skipped} skipped` : ""}`
+          `${result.created} participant(s) added${result.skipped > 0 ? `, ${result.skipped} skipped` : ""}`
         );
       },
       onError: (err) => toast.error(err.message),
@@ -94,41 +94,41 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Teams</CardTitle>
+        <CardTitle>Participants</CardTitle>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowBulk(true)}>
             Bulk Add
           </Button>
-          <Button onClick={() => setShowForm(true)}>Add Team</Button>
+          <Button onClick={() => setShowForm(true)}>Add Participant</Button>
         </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <LoadingState text="Loading teams..." />
-        ) : teams && teams.length > 0 ? (
+          <LoadingState text="Loading participants..." />
+        ) : participants && participants.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Captain</TableHead>
-                <TableHead>Games</TableHead>
+                <TableHead>Matches</TableHead>
                 <TableHead className="w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {teams.map((team) => (
-                <TableRow key={team.id}>
-                  <TableCell className="font-medium">{team.name}</TableCell>
-                  <TableCell>{team.captainName || "-"}</TableCell>
+              {participants.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell>{p.captainName || "-"}</TableCell>
                   <TableCell>
-                    {team._count.gamesAsTeam1 + team._count.gamesAsTeam2}
+                    {p._count.matchesAsParticipant1 + p._count.matchesAsParticipant2}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setEditingTeam(team)}
+                        onClick={() => setEditingTeam(p)}
                       >
                         Edit
                       </Button>
@@ -136,8 +136,8 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget({ id: team.id, name: team.name })}
-                        disabled={deleteTeam.isPending}
+                        onClick={() => setDeleteTarget({ id: p.id, name: p.name })}
+                        disabled={deleteParticipant.isPending}
                       >
                         Delete
                       </Button>
@@ -149,7 +149,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
           </Table>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No teams added yet. Add teams individually or use bulk add.
+            No participants added yet. Add participants individually or use bulk add.
           </p>
         )}
       </CardContent>
@@ -158,9 +158,9 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
         open={showForm}
         onOpenChange={setShowForm}
         onSubmit={(data) =>
-          createTeam.mutate({ tournamentId, ...data })
+          createParticipant.mutate({ tournamentId, ...data })
         }
-        isPending={createTeam.isPending}
+        isPending={createParticipant.isPending}
       />
 
       <TeamFormDialog
@@ -170,11 +170,11 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
         }}
         onSubmit={(data) => {
           if (editingTeam) {
-            updateTeam.mutate({ id: editingTeam.id, tournamentId, ...data });
+            updateParticipant.mutate({ id: editingTeam.id, tournamentId, ...data });
           }
         }}
         initialData={editingTeam ?? undefined}
-        isPending={updateTeam.isPending}
+        isPending={updateParticipant.isPending}
       />
 
       <BulkAddTeamsDialog
@@ -192,7 +192,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the team. This cannot be undone.
+              This will permanently delete the participant. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -200,7 +200,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
             <AlertDialogAction
               onClick={() => {
                 if (deleteTarget) {
-                  deleteTeam.mutate({ id: deleteTarget.id, tournamentId });
+                  deleteParticipant.mutate({ id: deleteTarget.id, tournamentId });
                   setDeleteTarget(null);
                 }
               }}

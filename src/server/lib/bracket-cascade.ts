@@ -5,13 +5,13 @@
 
 export interface CascadeGameInput {
   id: string;
-  team1Id: string | null;
-  team2Id: string | null;
+  participant1Id: string | null;
+  participant2Id: string | null;
   status: string;
-  scoreTeam1: number | null;
-  scoreTeam2: number | null;
-  feederGame1Id: string | null;
-  feederGame2Id: string | null;
+  scoreParticipant1: number | null;
+  scoreParticipant2: number | null;
+  feederMatch1Id: string | null;
+  feederMatch2Id: string | null;
 }
 
 export interface CascadeAnalysis {
@@ -22,10 +22,22 @@ export interface CascadeAnalysis {
 }
 
 export interface GameClearAction {
-  gameId: string;
+  matchId: string;
   clearTeam1: boolean;
   clearTeam2: boolean;
   clearScores: boolean;
+}
+
+function buildFedByMap(games: CascadeGameInput[]): Map<string, CascadeGameInput[]> {
+  const map = new Map<string, CascadeGameInput[]>();
+  for (const g of games) {
+    for (const feederId of [g.feederMatch1Id, g.feederMatch2Id]) {
+      if (!feederId) continue;
+      if (!map.has(feederId)) map.set(feederId, []);
+      map.get(feederId)!.push(g);
+    }
+  }
+  return map;
 }
 
 /**
@@ -49,17 +61,7 @@ export function analyzeCascade(
   }
 
   // Build forward adjacency: gameId -> games that reference it as a feeder
-  const fedBy = new Map<string, CascadeGameInput[]>();
-  for (const g of allGames) {
-    if (g.feederGame1Id) {
-      if (!fedBy.has(g.feederGame1Id)) fedBy.set(g.feederGame1Id, []);
-      fedBy.get(g.feederGame1Id)!.push(g);
-    }
-    if (g.feederGame2Id) {
-      if (!fedBy.has(g.feederGame2Id)) fedBy.set(g.feederGame2Id, []);
-      fedBy.get(g.feederGame2Id)!.push(g);
-    }
-  }
+  const fedBy = buildFedByMap(allGames);
 
   // BFS from edited game
   const downstream: string[] = [];
@@ -77,7 +79,7 @@ export function analyzeCascade(
       visited.add(child.id);
       downstream.push(child.id);
 
-      if (child.status === "COMPLETED" || child.status === "FORFEIT") {
+      if (child.status === "COMPLETE" || child.status === "FORFEIT") {
         scored.push(child.id);
       }
 
@@ -96,24 +98,14 @@ export function analyzeCascade(
 /**
  * Determine which team slots and scores to clear for each downstream game.
  * For each downstream game, figure out if the cascade chain reaches it
- * through feederGame1Id (clear team1) or feederGame2Id (clear team2).
+ * through feederMatch1Id (clear team1) or feederMatch2Id (clear team2).
  */
 export function getGamesToClear(
   editedGameId: string,
   allGames: CascadeGameInput[]
 ): GameClearAction[] {
   // Build forward adjacency
-  const fedBy = new Map<string, CascadeGameInput[]>();
-  for (const g of allGames) {
-    if (g.feederGame1Id) {
-      if (!fedBy.has(g.feederGame1Id)) fedBy.set(g.feederGame1Id, []);
-      fedBy.get(g.feederGame1Id)!.push(g);
-    }
-    if (g.feederGame2Id) {
-      if (!fedBy.has(g.feederGame2Id)) fedBy.set(g.feederGame2Id, []);
-      fedBy.get(g.feederGame2Id)!.push(g);
-    }
-  }
+  const fedBy = buildFedByMap(allGames);
 
   // BFS and track which team slot to clear
   const actions: GameClearAction[] = [];
@@ -133,13 +125,13 @@ export function getGamesToClear(
       inCascade.add(child.id);
 
       // Determine which slot(s) to clear based on which feeder is in the cascade
-      const clearTeam1 = child.feederGame1Id !== null && inCascade.has(child.feederGame1Id);
-      const clearTeam2 = child.feederGame2Id !== null && inCascade.has(child.feederGame2Id);
+      const clearTeam1 = child.feederMatch1Id !== null && inCascade.has(child.feederMatch1Id);
+      const clearTeam2 = child.feederMatch2Id !== null && inCascade.has(child.feederMatch2Id);
       const hasScores =
-        child.status === "COMPLETED" || child.status === "FORFEIT";
+        child.status === "COMPLETE" || child.status === "FORFEIT";
 
       actions.push({
-        gameId: child.id,
+        matchId: child.id,
         clearTeam1,
         clearTeam2,
         clearScores: hasScores,

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
 import { useTRPC } from "@/lib/trpc/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,31 +12,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "sonner";
 import { GameStatusBadge } from "./game-status-badge";
 import { ScoreEntryDialog } from "./score-entry-dialog";
 import { CascadeWarningDialog } from "./cascade-warning-dialog";
 import { type SetScore, type ScoringConfig, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
+import { useScoreEntry } from "@/hooks/use-score-entry";
 
-interface Game {
+interface Match {
   id: string;
   status: string;
   matchType?: string;
   roundPosition: number | null;
   scheduledAt: string | Date | null;
-  scoreTeam1: number | null;
-  scoreTeam2: number | null;
+  scoreParticipant1: number | null;
+  scoreParticipant2: number | null;
   setScores?: unknown;
-  team1: { id: string; name: string } | null;
-  team2: { id: string; name: string } | null;
+  participant1: { id: string; name: string } | null;
+  participant2: { id: string; name: string } | null;
   location: { id: string; name: string } | null;
-  pool: { id: string; name: string } | null;
 }
 
 interface GamesListProps {
-  games: Game[];
+  games: Match[];
   tournamentId: string;
-  showPool?: boolean;
   scoringConfig?: ScoringConfig;
 }
 
@@ -49,100 +46,41 @@ function formatSetScores(setScores: SetScore[] | null | undefined): string {
 export function GamesList({
   games,
   tournamentId,
-  showPool = false,
   scoringConfig,
 }: GamesListProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [scoringGame, setScoringGame] = useState<Game | null>(null);
-  const [cascadeInfo, setCascadeInfo] = useState<{
-    downstreamCount: number;
-    scoredCount: number;
-    pendingSetScores: { team1: number; team2: number }[];
-    gameId: string;
-    type: "score" | "reset";
-  } | null>(null);
-  const [pendingResetGameId, setPendingResetGameId] = useState<string | null>(null);
-  const lastSubmittedScores = useRef<{ team1: number; team2: number }[]>([]);
   const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
 
-  const invalidateGames = () => {
+  const invalidateMatches = () => {
     queryClient.invalidateQueries(
-      trpc.games.listByTournament.queryFilter({ tournamentId })
+      trpc.matches.listByTournament.queryFilter({ tournamentId })
     );
     queryClient.invalidateQueries(
-      trpc.games.listByRound.queryFilter()
-    );
-    queryClient.invalidateQueries(
-      trpc.games.getStandings.queryFilter()
+      trpc.matches.getStandings.queryFilter()
     );
   };
 
-  const updateScore = useMutation(
-    trpc.games.updateScore.mutationOptions({
-      onSuccess: () => {
-        invalidateGames();
-        setScoringGame(null);
-        setCascadeInfo(null);
-        toast.success("Score saved");
-      },
-      onError: (err) => {
-        const cause = (err as { data?: { cause?: { type?: string; downstreamCount?: number; scoredCount?: number } } }).data?.cause;
-        if (cause?.type === "CASCADE_REQUIRED" && scoringGame) {
-          setCascadeInfo({
-            downstreamCount: cause.downstreamCount ?? 0,
-            scoredCount: cause.scoredCount ?? 0,
-            pendingSetScores: lastSubmittedScores.current,
-            gameId: scoringGame.id,
-            type: "score",
-          });
-          return;
-        }
-        toast.error(err.message);
-      },
-    })
-  );
+  const {
+    scoringGameId,
+    setScoringGameId,
+    cascadeInfo,
+    setCascadeInfo,
+    submitScore,
+    submitForfeit,
+    submitReset,
+    confirmCascade,
+    isPending,
+    isResetPending,
+  } = useScoreEntry(tournamentId, invalidateMatches);
 
-  const updateStatus = useMutation(
-    trpc.games.updateStatus.mutationOptions({
-      onSuccess: () => {
-        invalidateGames();
-        setScoringGame(null);
-        toast.success("Status updated");
-      },
-      onError: (err) => toast.error(err.message),
-    })
-  );
-
-  const resetScore = useMutation(
-    trpc.games.resetScore.mutationOptions({
-      onSuccess: () => {
-        invalidateGames();
-        setCascadeInfo(null);
-        setPendingResetGameId(null);
-        toast.success("Score reset");
-      },
-      onError: (err) => {
-        const cause = (err as { data?: { cause?: { type?: string; downstreamCount?: number; scoredCount?: number } } }).data?.cause;
-        if (cause?.type === "CASCADE_REQUIRED" && pendingResetGameId) {
-          setCascadeInfo({
-            downstreamCount: cause.downstreamCount ?? 0,
-            scoredCount: cause.scoredCount ?? 0,
-            pendingSetScores: [],
-            gameId: pendingResetGameId,
-            type: "reset",
-          });
-          return;
-        }
-        setPendingResetGameId(null);
-        toast.error(err.message);
-      },
-    })
-  );
+  // Derive the selected game from the hook's scoringGameId — this automatically
+  // closes the dialog when the hook sets scoringGameId to null on mutation success.
+  const scoringGame = scoringGameId ? (games.find((g) => g.id === scoringGameId) ?? null) : null;
 
   if (games.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No games to display.</p>
+      <p className="text-sm text-muted-foreground">No matches to display.</p>
     );
   }
 
@@ -152,10 +90,9 @@ export function GamesList({
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
-            {showPool && <TableHead>Pool</TableHead>}
-            <TableHead>Team 1</TableHead>
+            <TableHead>Participant 1</TableHead>
             <TableHead className="text-center w-24">Score</TableHead>
-            <TableHead>Team 2</TableHead>
+            <TableHead>Participant 2</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Time</TableHead>
@@ -169,19 +106,14 @@ export function GamesList({
               <TableCell className="text-muted-foreground text-xs">
                 {game.roundPosition}
               </TableCell>
-              {showPool && (
-                <TableCell className="text-xs">
-                  {game.pool?.name ?? "-"}
-                </TableCell>
-              )}
               <TableCell className="font-medium">
-                {game.team1?.name ?? "TBD"}
+                {game.participant1?.name ?? "TBD"}
               </TableCell>
               <TableCell className="text-center">
-                {game.scoreTeam1 !== null && game.scoreTeam2 !== null ? (
+                {game.scoreParticipant1 !== null && game.scoreParticipant2 !== null ? (
                   <div>
                     <div className="font-mono font-bold">
-                      {game.scoreTeam1} - {game.scoreTeam2}
+                      {game.scoreParticipant1} - {game.scoreParticipant2}
                     </div>
                     {game.setScores != null && (
                       <div className="text-xs text-muted-foreground">
@@ -194,7 +126,7 @@ export function GamesList({
                 )}
               </TableCell>
               <TableCell className="font-medium">
-                {game.team2?.name ?? "TBD"}
+                {game.participant2?.name ?? "TBD"}
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="text-xs">
@@ -223,19 +155,16 @@ export function GamesList({
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => setScoringGame(game)}
+                    onClick={() => setScoringGameId(game.id)}
                   >
-                    {game.status === "COMPLETED" ? "Edit" : "Score"}
+                    {game.status === "COMPLETE" ? "Edit" : "Score"}
                   </Button>
-                  {game.status === "COMPLETED" && (
+                  {game.status === "COMPLETE" && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-7 text-xs"
-                      onClick={() => {
-                        setPendingResetGameId(game.id);
-                        resetScore.mutate({ id: game.id, tournamentId });
-                      }}
+                      onClick={() => submitReset(game.id)}
                     >
                       Reset
                     </Button>
@@ -248,44 +177,25 @@ export function GamesList({
       </Table>
 
       <ScoreEntryDialog
-        open={!!scoringGame}
+        open={!!scoringGameId}
         onOpenChange={(open) => {
-          if (!open) setScoringGame(null);
+          if (!open) setScoringGameId(null);
         }}
         onSubmit={(data) => {
-          if (scoringGame) {
-            lastSubmittedScores.current = data.setScores;
-            updateScore.mutate({
-              id: scoringGame.id,
-              tournamentId,
-              setScores: data.setScores,
-            });
+          if (scoringGameId) {
+            submitScore(scoringGameId, data.setScores);
           }
         }}
         onForfeit={(winnerId) => {
-          if (scoringGame) {
-            updateStatus.mutate({
-              id: scoringGame.id,
-              tournamentId,
-              status: "FORFEIT",
-              forfeitWinnerId: winnerId,
-            });
+          if (scoringGameId) {
+            submitForfeit(scoringGameId, winnerId);
           }
         }}
-        onCancel={() => {
-          if (scoringGame) {
-            updateStatus.mutate({
-              id: scoringGame.id,
-              tournamentId,
-              status: "CANCELLED",
-            });
-          }
-        }}
-        team1={scoringGame?.team1 ?? null}
-        team2={scoringGame?.team2 ?? null}
+        team1={scoringGame?.participant1 ?? null}
+        team2={scoringGame?.participant2 ?? null}
         scoringConfig={config}
         currentSetScores={scoringGame?.setScores as SetScore[] | null | undefined}
-        isPending={updateScore.isPending || updateStatus.isPending}
+        isPending={isPending}
       />
 
       <CascadeWarningDialog
@@ -293,26 +203,10 @@ export function GamesList({
         onOpenChange={(open) => {
           if (!open) setCascadeInfo(null);
         }}
-        onConfirm={() => {
-          if (!cascadeInfo) return;
-          if (cascadeInfo.type === "reset") {
-            resetScore.mutate({
-              id: cascadeInfo.gameId,
-              tournamentId,
-              confirmCascade: true,
-            });
-          } else {
-            updateScore.mutate({
-              id: cascadeInfo.gameId,
-              tournamentId,
-              setScores: cascadeInfo.pendingSetScores,
-              confirmCascade: true,
-            });
-          }
-        }}
+        onConfirm={confirmCascade}
         downstreamCount={cascadeInfo?.downstreamCount ?? 0}
         scoredCount={cascadeInfo?.scoredCount ?? 0}
-        isPending={updateScore.isPending || resetScore.isPending}
+        isPending={isPending || isResetPending}
       />
     </>
   );

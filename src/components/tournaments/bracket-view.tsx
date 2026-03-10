@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useTRPC } from "@/lib/trpc/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Minus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,10 +17,10 @@ import {
   ROW_GAP,
 } from "@/lib/bracket-layout";
 import { type ScoringConfig, type SetScore, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
+import { useScoreEntry } from "@/hooks/use-score-entry";
 
 interface BracketViewProps {
   tournamentId: string;
-  roundId: string;
   interactive?: boolean;
   scoringConfig?: ScoringConfig;
 }
@@ -30,25 +29,17 @@ const ZOOM_LEVELS = [0.5, 0.75, 1.0];
 
 export function BracketView({
   tournamentId,
-  roundId,
   interactive = false,
   scoringConfig,
 }: BracketViewProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [zoom, setZoom] = useState(1.0);
-  const [scoringGame, setScoringGame] = useState<MatchCardGame | null>(null);
-  const [cascadeInfo, setCascadeInfo] = useState<{
-    downstreamCount: number;
-    scoredCount: number;
-    gameId: string;
-  } | null>(null);
-  const lastSubmittedScores = useRef<{ team1: number; team2: number }[]>([]);
   const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
 
   const queryOptions = interactive
-    ? trpc.games.getBracketData.queryOptions({ roundId, tournamentId })
-    : trpc.games.getBracketDataPublic.queryOptions({ roundId, tournamentId });
+    ? trpc.matches.getBracketData.queryOptions({ tournamentId })
+    : trpc.matches.getBracketDataPublic.queryOptions({ tournamentId });
 
   const { data, isLoading } = useQuery(queryOptions);
   const rounds = data?.rounds;
@@ -60,20 +51,31 @@ export function BracketView({
         index: r.index,
         games: r.games.map((g) => ({
           id: g.id,
-          feederGame1Id: g.feederGame1Id,
-          feederGame2Id: g.feederGame2Id,
+          feederMatch1Id: g.feederMatch1Id,
+          feederMatch2Id: g.feederMatch2Id,
         })),
       }))
     );
   }, [rounds]);
 
-  // Build a game lookup for positioning
+  // Build a match lookup for positioning and dialog population
   const gameMap = useMemo(() => {
     if (!rounds) return new Map<string, MatchCardGame>();
     const map = new Map<string, MatchCardGame>();
     for (const round of rounds) {
       for (const g of round.games) {
-        map.set(g.id, g as unknown as MatchCardGame);
+        map.set(g.id, {
+          id: g.id,
+          status: g.status,
+          participant1: g.participant1 ? { ...g.participant1, seed: 0 } : null,
+          participant2: g.participant2 ? { ...g.participant2, seed: 0 } : null,
+          scoreParticipant1: g.scoreParticipant1,
+          scoreParticipant2: g.scoreParticipant2,
+          setScores: g.setScores as SetScore[] | null,
+          location: g.location,
+          scheduledAt: g.scheduledAt,
+          matchType: g.matchType,
+        });
       }
     }
     return map;
@@ -82,50 +84,31 @@ export function BracketView({
   const invalidateBracket = () => {
     queryClient.invalidateQueries(
       interactive
-        ? trpc.games.getBracketData.queryFilter({ roundId, tournamentId })
-        : trpc.games.getBracketDataPublic.queryFilter({ roundId, tournamentId })
+        ? trpc.matches.getBracketData.queryFilter({ tournamentId })
+        : trpc.matches.getBracketDataPublic.queryFilter({ tournamentId })
     );
     queryClient.invalidateQueries(
-      trpc.games.listByRound.queryFilter({ roundId, tournamentId })
+      trpc.matches.listByTournament.queryFilter({ tournamentId })
     );
     queryClient.invalidateQueries(
-      trpc.games.getStandings.queryFilter({ roundId })
+      trpc.matches.getStandings.queryFilter({ tournamentId })
     );
   };
 
-  const updateScore = useMutation(
-    trpc.games.updateScore.mutationOptions({
-      onSuccess: () => {
-        invalidateBracket();
-        setScoringGame(null);
-        setCascadeInfo(null);
-        toast.success("Score saved");
-      },
-      onError: (err) => {
-        const cause = (err as { data?: { cause?: { type?: string; downstreamCount?: number; scoredCount?: number } } }).data?.cause;
-        if (cause?.type === "CASCADE_REQUIRED" && scoringGame) {
-          setCascadeInfo({
-            downstreamCount: cause.downstreamCount ?? 0,
-            scoredCount: cause.scoredCount ?? 0,
-            gameId: scoringGame.id,
-          });
-          return;
-        }
-        toast.error(err.message);
-      },
-    })
-  );
+  const {
+    scoringGameId,
+    setScoringGameId,
+    cascadeInfo,
+    setCascadeInfo,
+    submitScore,
+    submitForfeit,
+    confirmCascade,
+    isPending,
+  } = useScoreEntry(tournamentId, invalidateBracket);
 
-  const updateStatus = useMutation(
-    trpc.games.updateStatus.mutationOptions({
-      onSuccess: () => {
-        invalidateBracket();
-        setScoringGame(null);
-        toast.success("Status updated");
-      },
-      onError: (err) => toast.error(err.message),
-    })
-  );
+  // Derive the selected game from the hook's scoringGameId — this automatically
+  // closes the dialog when the hook sets scoringGameId to null on mutation success.
+  const scoringGame = scoringGameId ? (gameMap.get(scoringGameId) ?? null) : null;
 
   if (isLoading) {
     return (
@@ -138,7 +121,7 @@ export function BracketView({
   if (!rounds || rounds.length === 0 || !layout) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        No bracket data. Generate games first.
+        No bracket data. Start the tournament to generate matches.
       </div>
     );
   }
@@ -232,7 +215,7 @@ export function BracketView({
               {layout.connectors.map((c, i) => {
                 const sourceGame = gameMap.get(c.fromId);
                 const isCompleted =
-                  sourceGame?.status === "COMPLETED" ||
+                  sourceGame?.status === "COMPLETE" ||
                   sourceGame?.status === "FORFEIT";
 
                 return (
@@ -269,7 +252,7 @@ export function BracketView({
                   <MatchCard
                     game={game}
                     interactive={interactive}
-                    onScore={interactive ? setScoringGame : undefined}
+                    onScore={interactive ? (g) => setScoringGameId(g.id) : undefined}
                   />
                 </div>
               );
@@ -281,46 +264,27 @@ export function BracketView({
         {interactive && (
           <>
             <ScoreEntryDialog
-              open={!!scoringGame}
+              open={!!scoringGameId}
               onOpenChange={(open) => {
-                if (!open) setScoringGame(null);
+                if (!open) setScoringGameId(null);
               }}
               onSubmit={(data) => {
-                if (scoringGame) {
-                  lastSubmittedScores.current = data.setScores;
-                  updateScore.mutate({
-                    id: scoringGame.id,
-                    tournamentId,
-                    setScores: data.setScores,
-                  });
+                if (scoringGameId) {
+                  submitScore(scoringGameId, data.setScores);
                 }
               }}
               onForfeit={(winnerId) => {
-                if (scoringGame) {
-                  updateStatus.mutate({
-                    id: scoringGame.id,
-                    tournamentId,
-                    status: "FORFEIT",
-                    forfeitWinnerId: winnerId,
-                  });
+                if (scoringGameId) {
+                  submitForfeit(scoringGameId, winnerId);
                 }
               }}
-              onCancel={() => {
-                if (scoringGame) {
-                  updateStatus.mutate({
-                    id: scoringGame.id,
-                    tournamentId,
-                    status: "CANCELLED",
-                  });
-                }
-              }}
-              team1={scoringGame?.team1 ?? null}
-              team2={scoringGame?.team2 ?? null}
+              team1={scoringGame?.participant1 ?? null}
+              team2={scoringGame?.participant2 ?? null}
               scoringConfig={config}
               currentSetScores={
                 scoringGame?.setScores as SetScore[] | null | undefined
               }
-              isPending={updateScore.isPending || updateStatus.isPending}
+              isPending={isPending}
             />
 
             <CascadeWarningDialog
@@ -328,19 +292,10 @@ export function BracketView({
               onOpenChange={(open) => {
                 if (!open) setCascadeInfo(null);
               }}
-              onConfirm={() => {
-                if (cascadeInfo) {
-                  updateScore.mutate({
-                    id: cascadeInfo.gameId,
-                    tournamentId,
-                    setScores: lastSubmittedScores.current,
-                    confirmCascade: true,
-                  });
-                }
-              }}
+              onConfirm={confirmCascade}
               downstreamCount={cascadeInfo?.downstreamCount ?? 0}
               scoredCount={cascadeInfo?.scoredCount ?? 0}
-              isPending={updateScore.isPending}
+              isPending={isPending}
             />
           </>
         )}

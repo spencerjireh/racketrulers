@@ -13,15 +13,15 @@ interface PublicTournamentCardProps {
     startDate: Date;
     endDate: Date;
     _count: {
-      rounds: number;
-      teams: number;
+      matches: number;
+      participants: number;
       locations: number;
     };
   };
 }
 
 function getTournamentDisplayStatus(tournament: PublicTournamentCardProps["tournament"]) {
-  if (tournament.status === "COMPLETED") return { label: "Completed", variant: "secondary" as const };
+  if (tournament.status === "COMPLETE") return { label: "Completed", variant: "secondary" as const };
   const now = new Date();
   const start = new Date(tournament.startDate);
   const end = new Date(tournament.endDate);
@@ -55,7 +55,7 @@ export function PublicTournamentCard({ tournament }: PublicTournamentCardProps) 
             </span>
             <span className="inline-flex items-center gap-1">
               <Users className="h-3.5 w-3.5" />
-              {tournament._count.teams} teams
+              {tournament._count.participants} participants
             </span>
             <span className="inline-flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5" />

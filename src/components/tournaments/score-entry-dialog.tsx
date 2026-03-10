@@ -18,7 +18,6 @@ interface ScoreEntryDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: { setScores: SetScore[] }) => void;
   onForfeit?: (winnerId: string) => void;
-  onCancel?: () => void;
   team1: { id: string; name: string } | null;
   team2: { id: string; name: string } | null;
   scoringConfig: ScoringConfig;
@@ -31,7 +30,6 @@ export function ScoreEntryDialog({
   onOpenChange,
   onSubmit,
   onForfeit,
-  onCancel,
   team1,
   team2,
   scoringConfig = DEFAULT_SCORING_CONFIG,
@@ -191,41 +189,26 @@ export function ScoreEntryDialog({
           {/* Validation error */}
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          {(onForfeit || onCancel) && team1 && team2 && (
+          {onForfeit && team1 && team2 && (
             <div className="flex flex-wrap gap-1">
-              {onForfeit && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => onForfeit(team1.id)}
-                  >
-                    Forfeit: {team2.name}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => onForfeit(team2.id)}
-                  >
-                    Forfeit: {team1.name}
-                  </Button>
-                </>
-              )}
-              {onCancel && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-xs text-destructive"
-                  onClick={onCancel}
-                >
-                  Cancel Game
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => onForfeit(team1.id)}
+              >
+                Forfeit: {team2.name}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => onForfeit(team2.id)}
+              >
+                Forfeit: {team1.name}
+              </Button>
             </div>
           )}
 

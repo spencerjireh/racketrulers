@@ -3,11 +3,10 @@
 import { Badge } from "@/components/ui/badge";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  SCHEDULED: { label: "Scheduled", variant: "outline" },
-  IN_PROGRESS: { label: "In Progress", variant: "default" },
-  COMPLETED: { label: "Completed", variant: "secondary" },
+  PENDING: { label: "Pending", variant: "outline" },
+  OPEN: { label: "In Progress", variant: "default" },
+  COMPLETE: { label: "Completed", variant: "secondary" },
   FORFEIT: { label: "Forfeit", variant: "destructive" },
-  CANCELLED: { label: "Cancelled", variant: "destructive" },
 };
 
 export function GameStatusBadge({ status }: { status: string }) {

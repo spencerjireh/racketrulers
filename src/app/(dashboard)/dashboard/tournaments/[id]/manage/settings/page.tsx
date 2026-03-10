@@ -29,7 +29,7 @@ export default function TournamentSettingsPage({
     return <p className="text-sm text-muted-foreground">Tournament not found.</p>;
   }
 
-  const isCompleted = tournament.status === "COMPLETED";
+  const isCompleted = tournament.status === "COMPLETE";
   const pointsConfig = (tournament.pointsConfig as { win: number; draw: number; loss: number } | null) ?? {
     win: 3,
     draw: 1,

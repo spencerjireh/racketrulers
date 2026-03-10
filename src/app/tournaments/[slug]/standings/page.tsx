@@ -10,12 +10,5 @@ export default async function PublicStandingsPage({
   const caller = await createServerCaller();
   const tournament = await caller.tournaments.getBySlug({ slug });
 
-  const rounds = (tournament.rounds ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    type: r.type,
-    pools: r.pools.map((p) => ({ id: p.id, name: p.name })),
-  }));
-
-  return <PublicStandingsView rounds={rounds} />;
+  return <PublicStandingsView tournamentId={tournament.id} />;
 }

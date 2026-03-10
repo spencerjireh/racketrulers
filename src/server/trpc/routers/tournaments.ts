@@ -4,6 +4,14 @@ import { baseProcedure, protectedProcedure, createTRPCRouter } from "../init";
 import { generateUniqueSlug } from "@/lib/slug";
 import { verifyTournamentOwnership } from "../helpers";
 import { stripUndefined } from "@/lib/utils";
+import {
+  generateRoundRobinGames,
+  generateSingleElimGames,
+  generateDoubleElimGames,
+  generateSwissPairings,
+} from "@/server/lib/game-generation";
+import { emitToTournament } from "@/lib/socket";
+import { calculateStandings } from "@/server/lib/standings";
 
 export const tournamentsRouter = createTRPCRouter({
   getStats: protectedProcedure.query(async ({ ctx }) => {
@@ -15,7 +23,7 @@ export const tournamentsRouter = createTRPCRouter({
         where: {
           ownerId: ctx.userId,
           deletedAt: null,
-          status: "PUBLISHED",
+          status: "UNDERWAY",
         },
       }),
     ]);
@@ -29,8 +37,8 @@ export const tournamentsRouter = createTRPCRouter({
       include: {
         _count: {
           select: {
-            rounds: true,
-            teams: true,
+            matches: true,
+            participants: true,
             locations: true,
           },
         },
@@ -47,6 +55,8 @@ export const tournamentsRouter = createTRPCRouter({
         startDate: z.string(),
         endDate: z.string(),
         timezone: z.string().default("Asia/Manila"),
+        thirdPlaceMatch: z.boolean().optional(),
+        grandFinalsModifier: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -71,27 +81,11 @@ export const tournamentsRouter = createTRPCRouter({
           endDate: end,
           timezone: input.timezone,
           ownerId: ctx.userId,
-          status: "DRAFT",
+          status: "PENDING",
+          thirdPlaceMatch: input.thirdPlaceMatch ?? false,
+          grandFinalsModifier: input.grandFinalsModifier || null,
         },
       });
-
-      // Auto-create a default round if format is provided
-      if (input.format) {
-        const roundNames: Record<string, string> = {
-          ROUND_ROBIN: "Round Robin",
-          SINGLE_ELIM: "Bracket",
-          DOUBLE_ELIM: "Bracket",
-          SWISS: "Swiss",
-        };
-        await ctx.prisma.round.create({
-          data: {
-            name: roundNames[input.format] ?? "Round 1",
-            type: input.format,
-            order: 0,
-            tournamentId: tournament.id,
-          },
-        });
-      }
 
       return tournament;
     }),
@@ -111,24 +105,11 @@ export const tournamentsRouter = createTRPCRouter({
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
       const tournament = await ctx.prisma.tournament.findFirst({
-        where: { slug: input.slug, deletedAt: null, status: { not: "DRAFT" } },
+        where: { slug: input.slug, deletedAt: null, status: { not: "PENDING" } },
         include: {
           locations: true,
-          teams: { orderBy: { seed: "asc" } },
-          rounds: {
-            orderBy: { order: "asc" },
-            include: {
-              pools: {
-                include: {
-                  poolTeams: {
-                    include: { team: { select: { id: true, name: true } } },
-                    orderBy: { seed: "asc" },
-                  },
-                },
-              },
-              _count: { select: { games: true } },
-            },
-          },
+          participants: { orderBy: { seed: "asc" } },
+          _count: { select: { matches: true } },
         },
       });
       if (!tournament) throw new TRPCError({ code: "NOT_FOUND" });
@@ -141,11 +122,13 @@ export const tournamentsRouter = createTRPCRouter({
         id: z.string(),
         name: z.string().min(1).optional(),
         description: z.string().optional(),
-        format: z.enum(["ROUND_ROBIN", "SINGLE_ELIM", "DOUBLE_ELIM", "SWISS", "CUSTOM"]).nullable().optional(),
+        format: z.enum(["ROUND_ROBIN", "SINGLE_ELIM", "DOUBLE_ELIM", "SWISS"]).nullable().optional(),
         drawsAllowed: z.boolean().optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         timezone: z.string().optional(),
+        thirdPlaceMatch: z.boolean().optional(),
+        grandFinalsModifier: z.string().optional(),
         pointsConfig: z
           .object({
             win: z.number(),
@@ -182,7 +165,7 @@ export const tournamentsRouter = createTRPCRouter({
         ctx.userId
       );
 
-      if (tournament.status === "COMPLETED") {
+      if (tournament.status === "COMPLETE") {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "Cannot update a completed tournament",
@@ -196,6 +179,8 @@ export const tournamentsRouter = createTRPCRouter({
         format: data.format,
         drawsAllowed: data.drawsAllowed,
         timezone: data.timezone,
+        thirdPlaceMatch: data.thirdPlaceMatch,
+        grandFinalsModifier: data.grandFinalsModifier,
         pointsConfig: data.pointsConfig,
         scoringConfig: data.scoringConfig,
         scheduleConfig: data.scheduleConfig,
@@ -210,51 +195,162 @@ export const tournamentsRouter = createTRPCRouter({
       });
     }),
 
-  publish: protectedProcedure
+  start: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
 
-      if (tournament.status !== "DRAFT") {
+      if (tournament.status !== "PENDING") {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Only draft tournaments can be published",
+          message: "Only pending tournaments can be started",
         });
       }
 
-      const [teamCount, gameCount] = await Promise.all([
-        ctx.prisma.team.count({ where: { tournamentId: input.id } }),
-        ctx.prisma.game.count({
-          where: { round: { tournamentId: input.id } },
-        }),
-      ]);
-
-      if (teamCount < 2) {
+      const participantCount = await ctx.prisma.participant.count({
+        where: { tournamentId: input.id },
+      });
+      if (participantCount < 2) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "Tournament must have at least 2 participants",
         });
       }
-      if (gameCount === 0) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Games must be generated before publishing",
-        });
-      }
 
-      return ctx.prisma.tournament.update({
-        where: { id: input.id },
-        data: { status: "PUBLISHED" },
+      const participants = await ctx.prisma.participant.findMany({
+        where: { tournamentId: input.id },
+        orderBy: { seed: "asc" },
       });
+      const participantIds = participants.map((p) => p.id);
+
+      await ctx.prisma.$transaction(async (tx) => {
+        // Clear any existing matches (in case of re-start)
+        await tx.match.deleteMany({ where: { tournamentId: input.id } });
+
+        if (tournament.format === "ROUND_ROBIN") {
+          const matchSeeds = generateRoundRobinGames(participantIds);
+          await tx.match.createMany({
+            data: matchSeeds.map((m) => ({
+              participant1Id: m.participant1Id,
+              participant2Id: m.participant2Id,
+              roundPosition: m.roundPosition,
+              round: 1,
+              tournamentId: input.id,
+              status: "PENDING" as const,
+            })),
+          });
+        } else if (tournament.format === "SINGLE_ELIM") {
+          const consolation = tournament.thirdPlaceMatch;
+          const gameSeeds = generateSingleElimGames(participantIds, consolation);
+
+          // Pass 1: Create all matches without feeder links
+          const ids: string[] = [];
+          for (const g of gameSeeds) {
+            const created = await tx.match.create({
+              data: {
+                participant1Id: g.participant1Id,
+                participant2Id: g.participant2Id,
+                roundPosition: g.roundPosition,
+                round: (g.bracketRound ?? 0) + 1,
+                tournamentId: input.id,
+                status: "PENDING" as const,
+              },
+            });
+            ids.push(created.id);
+          }
+
+          // Pass 2: Link feeder matches using positional indices
+          for (let i = 0; i < gameSeeds.length; i++) {
+            const seed = gameSeeds[i];
+            if (seed.feederIndex1 != null || seed.feederIndex2 != null) {
+              await tx.match.update({
+                where: { id: ids[i] },
+                data: {
+                  feederMatch1Id: seed.feederIndex1 != null ? ids[seed.feederIndex1] : undefined,
+                  feederMatch2Id: seed.feederIndex2 != null ? ids[seed.feederIndex2] : undefined,
+                },
+              });
+            }
+          }
+
+          // Pass 3: Auto-complete bye matches (exactly one participant is null)
+          for (let i = 0; i < gameSeeds.length; i++) {
+            const seed = gameSeeds[i];
+            if ((seed.participant1Id === null) !== (seed.participant2Id === null)) {
+              await tx.match.update({
+                where: { id: ids[i] },
+                data: {
+                  status: "COMPLETE" as const,
+                  scoreParticipant1: seed.participant1Id ? 1 : 0,
+                  scoreParticipant2: seed.participant2Id ? 1 : 0,
+                  setScores: [{ team1: seed.participant1Id ? 21 : 0, team2: seed.participant2Id ? 21 : 0 }],
+                },
+              });
+            }
+          }
+        } else if (tournament.format === "DOUBLE_ELIM") {
+          const resetMatch = tournament.grandFinalsModifier !== "GRAND_FINALS_SINGLE_MATCH";
+          const gameSeeds = generateDoubleElimGames(participantIds, resetMatch);
+
+          const ids: string[] = [];
+          for (const g of gameSeeds) {
+            const created = await tx.match.create({
+              data: {
+                participant1Id: g.participant1Id,
+                participant2Id: g.participant2Id,
+                roundPosition: g.roundPosition,
+                round: (g.bracketRound ?? 0) + 1,
+                tournamentId: input.id,
+                status: "PENDING" as const,
+              },
+            });
+            ids.push(created.id);
+          }
+
+          // Link feeder matches
+          for (let i = 0; i < gameSeeds.length; i++) {
+            const seed = gameSeeds[i];
+            if (seed.feederIndex1 != null || seed.feederIndex2 != null) {
+              await tx.match.update({
+                where: { id: ids[i] },
+                data: {
+                  feederMatch1Id: seed.feederIndex1 != null ? ids[seed.feederIndex1] : undefined,
+                  feederMatch2Id: seed.feederIndex2 != null ? ids[seed.feederIndex2] : undefined,
+                },
+              });
+            }
+          }
+        } else if (tournament.format === "SWISS") {
+          const matchSeeds = generateSwissPairings(participantIds);
+          await tx.match.createMany({
+            data: matchSeeds.map((m) => ({
+              participant1Id: m.participant1Id,
+              participant2Id: m.participant2Id,
+              roundPosition: m.roundPosition,
+              round: 1,
+              tournamentId: input.id,
+              status: "PENDING" as const,
+            })),
+          });
+        }
+
+        await tx.tournament.update({
+          where: { id: input.id },
+          data: { status: "UNDERWAY" },
+        });
+      });
+
+      emitToTournament(input.id, "tournament:updated", { status: "UNDERWAY" });
+      return ctx.prisma.tournament.findFirst({ where: { id: input.id } });
     }),
 
-  complete: protectedProcedure
+  finalize: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
       return ctx.prisma.tournament.update({
         where: { id: input.id },
-        data: { status: "COMPLETED" },
+        data: { status: "COMPLETE" },
       });
     }),
 
@@ -264,7 +360,7 @@ export const tournamentsRouter = createTRPCRouter({
       await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
       return ctx.prisma.tournament.update({
         where: { id: input.id },
-        data: { status: "PUBLISHED" },
+        data: { status: "UNDERWAY" },
       });
     }),
 
@@ -294,7 +390,7 @@ export const tournamentsRouter = createTRPCRouter({
       const now = new Date();
       const where: Record<string, unknown> = {
         deletedAt: null,
-        status: { not: "DRAFT" },
+        status: { not: "PENDING" },
       };
 
       if (input.search) {
@@ -302,14 +398,14 @@ export const tournamentsRouter = createTRPCRouter({
       }
 
       if (input.status === "upcoming") {
-        where.status = "PUBLISHED";
+        where.status = "UNDERWAY";
         where.startDate = { gt: now };
       } else if (input.status === "in-progress") {
-        where.status = "PUBLISHED";
+        where.status = "UNDERWAY";
         where.startDate = { lte: now };
         where.endDate = { gte: now };
       } else if (input.status === "completed") {
-        where.status = "COMPLETED";
+        where.status = "COMPLETE";
       }
 
       const [tournaments, totalCount] = await Promise.all([
@@ -330,8 +426,8 @@ export const tournamentsRouter = createTRPCRouter({
             endDate: true,
             _count: {
               select: {
-                rounds: true,
-                teams: true,
+                matches: true,
+                participants: true,
                 locations: true,
               },
             },
@@ -346,5 +442,55 @@ export const tournamentsRouter = createTRPCRouter({
         totalPages: Math.ceil(totalCount / input.pageSize),
         currentPage: input.page,
       };
+    }),
+
+  generateNextSwissRound: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
+
+      if (tournament.format !== "SWISS") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This tournament is not Swiss format",
+        });
+      }
+
+      const matches = await ctx.prisma.match.findMany({
+        where: { tournamentId: input.id },
+        include: {
+          participant1: { select: { id: true, name: true } },
+          participant2: { select: { id: true, name: true } },
+        },
+      });
+
+      const pointsConfig = tournament.pointsConfig as { win: number; draw: number; loss: number };
+      const tiebreakerConfig = tournament.tiebreakerConfig as { order: string[] };
+
+      const standings = calculateStandings(matches, pointsConfig, tiebreakerConfig);
+
+      const previousResults = standings.map((s) => ({
+        teamId: s.participantId,
+        wins: s.wins,
+        losses: s.losses,
+      }));
+
+      const participantIds = standings.map((s) => s.participantId);
+      const matchSeeds = generateSwissPairings(participantIds, previousResults);
+
+      const maxRound = matches.reduce((max, m) => Math.max(max, m.round ?? 0), 0);
+
+      await ctx.prisma.match.createMany({
+        data: matchSeeds.map((m) => ({
+          participant1Id: m.participant1Id,
+          participant2Id: m.participant2Id,
+          roundPosition: m.roundPosition,
+          round: maxRound + 1,
+          tournamentId: input.id,
+          status: "PENDING" as const,
+        })),
+      });
+
+      return { matchesCreated: matchSeeds.length, round: maxRound + 1 };
     }),
 });

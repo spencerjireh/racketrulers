@@ -31,7 +31,7 @@ export function TournamentHeader({
         <h1 className="text-2xl font-bold">{name}</h1>
         {(() => {
           const now = new Date();
-          const displayStatus = status === "COMPLETED"
+          const displayStatus = status === "COMPLETE"
             ? { label: "Completed", variant: "secondary" as const }
             : start > now
               ? { label: "Upcoming", variant: "outline" as const }
