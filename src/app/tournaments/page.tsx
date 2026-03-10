@@ -43,11 +43,6 @@ function ExplorePageContent() {
   const [tournamentPage, setTournamentPage] = useState(1);
   const debouncedTournamentSearch = useDebouncedValue(tournamentSearch);
 
-  // Coaches state
-  const [coachSearch, setCoachSearch] = useState("");
-  const [coachPage, setCoachPage] = useState(1);
-  const debouncedCoachSearch = useDebouncedValue(coachSearch);
-
   const { data: tournamentsData, isLoading: tournamentsLoading } = useQuery(
     trpc.tournaments.listPublic.queryOptions({
       search: debouncedTournamentSearch || undefined,
@@ -57,10 +52,7 @@ function ExplorePageContent() {
   );
 
   const { data: coachesData, isLoading: coachesLoading } = useQuery(
-    trpc.coach.listPublic.queryOptions({
-      search: debouncedCoachSearch || undefined,
-      page: coachPage,
-    })
+    trpc.coach.getPublic.queryOptions()
   );
 
   return (
@@ -175,54 +167,12 @@ function ExplorePageContent() {
 
           {/* -- Coaches Tab -- */}
           <TabsContent value="coaches" className="mt-6">
-            <div className="mb-6">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search coaches..."
-                  value={coachSearch}
-                  onChange={(e) => {
-                    setCoachSearch(e.target.value);
-                    setCoachPage(1);
-                  }}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
             {coachesLoading ? (
               <LoadingState text="Loading coaches..." variant="centered" />
-            ) : coachesData && coachesData.coaches.length > 0 ? (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {coachesData.coaches.map((coach) => (
-                    <PublicCoachCard key={coach.id} coach={coach} />
-                  ))}
-                </div>
-                {coachesData.totalPages > 1 && (
-                  <div className="mt-8 flex items-center justify-center gap-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={coachPage <= 1}
-                      onClick={() => setCoachPage((p) => p - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {coachesData.currentPage} of {coachesData.totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={coachPage >= coachesData.totalPages}
-                      onClick={() => setCoachPage((p) => p + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
-              </>
+            ) : !!coachesData ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <PublicCoachCard coach={coachesData} />
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16">
                 <Users className="h-12 w-12 text-muted-foreground/40" />

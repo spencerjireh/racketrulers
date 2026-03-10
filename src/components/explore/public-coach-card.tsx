@@ -17,7 +17,7 @@ interface PublicCoachCardProps {
 
 export function PublicCoachCard({ coach }: PublicCoachCardProps) {
   return (
-    <Link href={`/book/${coach.slug}`} className="block">
+    <Link href="/book" className="block">
       <Card className="h-full transition-colors hover:border-primary/40">
         <CardHeader>
           <CardTitle className="text-lg">{coach.displayName}</CardTitle>

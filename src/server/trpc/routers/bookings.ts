@@ -1,42 +1,26 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { baseProcedure, createTRPCRouter } from "../init";
+import { COACH_SLUG } from "@/lib/constants";
+import { toLocalDateStr } from "@/lib/utils";
 
 export const bookingsRouter = createTRPCRouter({
-  getCoachPublic: baseProcedure
-    .input(z.object({ slug: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const profile = await ctx.prisma.coachProfile.findUnique({
-        where: { slug: input.slug },
-        select: {
-          id: true,
-          displayName: true,
-          slug: true,
-          sessionDurationMinutes: true,
-          timezone: true,
-        },
-      });
-      if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
-      return profile;
-    }),
-
   getAvailableSlots: baseProcedure
     .input(
       z.object({
-        slug: z.string(),
         from: z.string(),
         to: z.string(),
       })
     )
     .query(async ({ ctx, input }) => {
       const profile = await ctx.prisma.coachProfile.findUnique({
-        where: { slug: input.slug },
+        where: { slug: COACH_SLUG },
         include: { availability: true },
       });
       if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const fromDate = new Date(input.from);
-      const toDate = new Date(input.to);
+      const fromDate = new Date(input.from + "T00:00:00");
+      const toDate = new Date(input.to + "T00:00:00");
 
       // Max 8 weeks
       const maxRange = 56 * 24 * 60 * 60 * 1000;
@@ -57,7 +41,7 @@ export const bookingsRouter = createTRPCRouter({
       });
 
       const bookedSlots = new Set(
-        bookings.map((b) => `${b.date.toISOString().split("T")[0]}_${b.startTime}`)
+        bookings.map((b) => `${toLocalDateStr(new Date(b.date))}_${b.startTime}`)
       );
 
       const duration = profile.sessionDurationMinutes;
@@ -67,7 +51,7 @@ export const bookingsRouter = createTRPCRouter({
       // Iterate through each date in range
       const current = new Date(fromDate);
       while (current <= toDate) {
-        const dateStr = current.toISOString().split("T")[0];
+        const dateStr = toLocalDateStr(current);
         // dayOfWeek: 0=Monday in schema, but JS Date: 0=Sunday
         const jsDay = current.getDay();
         const schemaDay = jsDay === 0 ? 6 : jsDay - 1; // Convert to Mon=0
@@ -114,7 +98,6 @@ export const bookingsRouter = createTRPCRouter({
   create: baseProcedure
     .input(
       z.object({
-        slug: z.string(),
         date: z.string(),
         startTime: z.string().regex(/^\d{2}:\d{2}$/),
         bookerName: z.string().min(1, "Name is required"),
@@ -124,7 +107,7 @@ export const bookingsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const profile = await ctx.prisma.coachProfile.findUnique({
-        where: { slug: input.slug },
+        where: { slug: COACH_SLUG },
       });
       if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
 

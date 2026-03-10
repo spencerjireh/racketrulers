@@ -24,3 +24,18 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): Parti
   }
   return result;
 }
+
+/** Format a Date as a local YYYY-MM-DD string. */
+export function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Return the Monday of the week containing `date` (week starts Mon). */
+export function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}

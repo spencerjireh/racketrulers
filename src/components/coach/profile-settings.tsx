@@ -59,7 +59,7 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
   }
 
   async function handleCopyUrl() {
-    const url = `${window.location.origin}/book/${profile.slug}`;
+    const url = `${window.location.origin}/book`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("URL copied to clipboard");
@@ -72,7 +72,7 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
         <Label>Booking URL</Label>
         <div className="flex items-center gap-2">
           <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md truncate">
-            /book/{profile.slug}
+            /book
           </code>
           <Button
             type="button"

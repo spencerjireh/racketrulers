@@ -11,15 +11,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, User, Calendar, BookOpen } from "lucide-react";
-import { ProfileSetup } from "./profile-setup";
+import { ChevronDown, ChevronRight, User, Calendar, CalendarDays, BookOpen } from "lucide-react";
 import { ProfileSettings } from "./profile-settings";
 import { AvailabilityEditor } from "./availability-editor";
+import { BookingsCalendar } from "./bookings-calendar";
 import { BookingsList } from "./bookings-list";
 
 const SECTIONS = [
   { id: "profile", label: "Profile Settings", icon: User },
   { id: "availability", label: "Weekly Availability", icon: Calendar },
+  { id: "calendar", label: "Month Overview", icon: CalendarDays },
   { id: "bookings", label: "Bookings", icon: BookOpen },
 ] as const;
 
@@ -40,7 +41,15 @@ export function CoachDashboard() {
   }
 
   if (!profile) {
-    return <ProfileSetup />;
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Coach profile not found. Please run the seed script.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   function toggleSection(id: SectionId) {
@@ -92,6 +101,7 @@ export function CoachDashboard() {
                     }))}
                   />
                 )}
+                {id === "calendar" && <BookingsCalendar />}
                 {id === "bookings" && <BookingsList />}
               </CardContent>
             </CollapsibleContent>

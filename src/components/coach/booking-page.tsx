@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTRPC } from "@/lib/trpc/client";
+import { toLocalDateStr, getMonday } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { MonthCalendar } from "@/components/ui/month-calendar";
-import { toast } from "sonner";
-import { SlotPicker } from "./slot-picker";
+import { WeekView } from "./week-view";
 import { BookingConfirmation } from "./booking-confirmation";
+import { toast } from "sonner";
 
-interface BookingPageProps {
-  slug: string;
-}
-
-export function BookingPage({ slug }: BookingPageProps) {
+export function BookingPage() {
   const trpc = useTRPC();
+  const [view, setView] = useState<"month" | "week">("month");
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [bookerName, setBookerName] = useState("");
@@ -30,24 +28,22 @@ export function BookingPage({ slug }: BookingPageProps) {
   const now = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [weekStart, setWeekStart] = useState(() => getMonday(now));
 
   const { data: coach, isLoading: coachLoading } = useQuery(
-    trpc.bookings.getCoachPublic.queryOptions({ slug })
+    trpc.coach.getPublic.queryOptions()
   );
 
-  const from = useMemo(() => {
-    const d = new Date();
-    return d.toISOString().split("T")[0];
-  }, []);
+  const from = useMemo(() => toLocalDateStr(new Date()), []);
 
   const to = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 56);
-    return d.toISOString().split("T")[0];
+    return toLocalDateStr(d);
   }, []);
 
   const { data: availableSlots } = useQuery({
-    ...trpc.bookings.getAvailableSlots.queryOptions({ slug, from, to }),
+    ...trpc.bookings.getAvailableSlots.queryOptions({ from, to }),
     enabled: !!coach,
   });
 
@@ -81,9 +77,18 @@ export function BookingPage({ slug }: BookingPageProps) {
   }
 
   const availableDateSet = new Set(Object.keys(availableSlots ?? {}));
-  const slotsForDate = selectedDate
-    ? (availableSlots?.[selectedDate] ?? [])
-    : [];
+
+  function handleDayClick(date: string) {
+    setWeekStart(getMonday(new Date(date + "T00:00:00")));
+    setSelectedDate("");
+    setSelectedSlot(null);
+    setView("week");
+  }
+
+  function handleSlotSelect(date: string, slot: string) {
+    setSelectedDate(date);
+    setSelectedSlot(slot);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,7 +96,6 @@ export function BookingPage({ slug }: BookingPageProps) {
       return;
 
     createBooking.mutate({
-      slug,
       date: selectedDate,
       startTime: selectedSlot,
       bookerName: bookerName.trim(),
@@ -109,42 +113,55 @@ export function BookingPage({ slug }: BookingPageProps) {
         </p>
       </div>
 
+      <div className="flex gap-2">
+        <Button
+          variant={view === "month" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView("month")}
+        >
+          Month
+        </Button>
+        <Button
+          variant={view === "week" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView("week")}
+        >
+          Week
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Select a Date</CardTitle>
+          <CardTitle>
+            {view === "month" ? "Select a Date" : "Select a Time"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <MonthCalendar
-            month={currentMonth}
-            year={currentYear}
-            availableDates={availableDateSet}
-            selectedDate={selectedDate || null}
-            onSelect={(date) => {
-              setSelectedDate(date);
-              setSelectedSlot(null);
-            }}
-            onMonthChange={(m, y) => {
-              setCurrentMonth(m);
-              setCurrentYear(y);
-            }}
-          />
+          {view === "month" ? (
+            <MonthCalendar
+              month={currentMonth}
+              year={currentYear}
+              availableDates={availableDateSet}
+              selectedDate={null}
+              onSelect={handleDayClick}
+              onMonthChange={(m, y) => {
+                setCurrentMonth(m);
+                setCurrentYear(y);
+              }}
+              slotsByDate={availableSlots}
+            />
+          ) : (
+            <WeekView
+              weekStart={weekStart}
+              slotsByDate={availableSlots ?? {}}
+              selectedDate={selectedDate || null}
+              selectedSlot={selectedSlot}
+              onSelectSlot={handleSlotSelect}
+              onWeekChange={setWeekStart}
+            />
+          )}
         </CardContent>
       </Card>
-
-      {selectedDate && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Select a Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SlotPicker
-              slots={slotsForDate}
-              selectedSlot={selectedSlot}
-              onSelect={setSelectedSlot}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       {selectedSlot && (
         <Card>

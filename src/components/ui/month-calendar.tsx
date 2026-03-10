@@ -1,19 +1,29 @@
 "use client";
 
 import { useMemo } from "react";
+import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, toLocalDateStr } from "@/lib/utils";
 
 const DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatSlotTime(time: string): string {
+  const [h] = time.split(":").map(Number);
+  if (h === 0) return "12am";
+  if (h === 12) return "12pm";
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+}
 
 interface MonthCalendarProps {
   month: number; // 0-11
   year: number;
-  availableDates: Set<string>;
-  selectedDate: string | null;
-  onSelect: (date: string) => void;
+  availableDates?: Set<string>;
+  selectedDate?: string | null;
+  onSelect?: (date: string) => void;
   onMonthChange: (month: number, year: number) => void;
+  slotsByDate?: Record<string, string[]>;
+  renderDay?: (dateStr: string, day: number) => ReactNode;
 }
 
 export function MonthCalendar({
@@ -23,11 +33,10 @@ export function MonthCalendar({
   selectedDate,
   onSelect,
   onMonthChange,
+  slotsByDate,
+  renderDay,
 }: MonthCalendarProps) {
-  const today = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, []);
+  const today = useMemo(() => toLocalDateStr(new Date()), []);
 
   const { firstDayOffset, daysInMonth } = useMemo(() => {
     const firstDay = new Date(year, month, 1).getDay();
@@ -56,6 +65,9 @@ export function MonthCalendar({
     year: "numeric",
   });
 
+  const hasSlotPreviews = !!slotsByDate;
+  const hasExpandedCells = hasSlotPreviews || !!renderDay;
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-3">
@@ -79,24 +91,43 @@ export function MonthCalendar({
         ))}
 
         {Array.from({ length: firstDayOffset }).map((_, i) => (
-          <div key={`empty-${i}`} />
+          <div key={`empty-${i}`} className={hasExpandedCells ? "min-h-[72px]" : ""} />
         ))}
 
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
-          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const isAvailable = availableDates.has(dateStr);
+          const dateStr = toLocalDateStr(new Date(year, month, day));
+
+          if (renderDay) {
+            return (
+              <div
+                key={dateStr}
+                className={cn(
+                  "min-h-[72px] rounded-md border p-1 flex flex-col gap-0.5",
+                  dateStr === today && "ring-1 ring-primary/30"
+                )}
+              >
+                {renderDay(dateStr, day)}
+              </div>
+            );
+          }
+
+          const isAvailable = availableDates?.has(dateStr) ?? false;
           const isSelected = selectedDate === dateStr;
           const isPast = dateStr < today;
+          const daySlots = slotsByDate?.[dateStr];
 
           return (
             <button
               key={dateStr}
               type="button"
               disabled={!isAvailable || isPast}
-              onClick={() => onSelect(dateStr)}
+              onClick={() => onSelect?.(dateStr)}
               className={cn(
-                "h-9 w-full rounded-md text-sm transition-colors",
+                "w-full rounded-md text-sm transition-colors",
+                hasSlotPreviews
+                  ? "min-h-[72px] flex flex-col items-center pt-1.5 gap-0.5"
+                  : "h-9",
                 isSelected
                   ? "bg-primary text-primary-foreground font-medium"
                   : isAvailable && !isPast
@@ -105,7 +136,36 @@ export function MonthCalendar({
                 dateStr === today && !isSelected && "ring-1 ring-primary/30"
               )}
             >
-              {day}
+              <span>{day}</span>
+              {hasSlotPreviews && daySlots && daySlots.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-0.5 px-0.5">
+                  {daySlots.slice(0, 3).map((slot) => (
+                    <span
+                      key={slot}
+                      className={cn(
+                        "text-[10px] rounded px-1 leading-tight",
+                        isSelected
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-primary/10 text-primary"
+                      )}
+                    >
+                      {formatSlotTime(slot)}
+                    </span>
+                  ))}
+                  {daySlots.length > 3 && (
+                    <span
+                      className={cn(
+                        "text-[10px] rounded px-1 leading-tight",
+                        isSelected
+                          ? "text-primary-foreground/70"
+                          : "text-primary/70"
+                      )}
+                    >
+                      +{daySlots.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
             </button>
           );
         })}
