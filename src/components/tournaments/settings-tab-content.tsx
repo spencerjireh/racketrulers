@@ -6,6 +6,7 @@ import { TournamentSettingsForm } from "./tournament-settings-form";
 import { PointsConfigForm } from "./points-config-form";
 import { LocationsManager } from "./locations-manager";
 import { DeleteTournamentDialog } from "./delete-tournament-dialog";
+import { ResetTournamentDialog } from "./reset-tournament-dialog";
 import { LoadingState } from "@/components/ui/loading-state";
 
 export function SettingsTabContent({ tournamentId }: { tournamentId: string }) {
@@ -47,7 +48,32 @@ export function SettingsTabContent({ tournamentId }: { tournamentId: string }) {
 
       <section className="border-t pt-6">
         <h2 className="text-lg font-semibold mb-4 text-destructive">Danger Zone</h2>
-        <DeleteTournamentDialog tournamentId={tournamentId} />
+        <div className="space-y-4">
+          {(tournament.status === "UNDERWAY" || tournament.status === "COMPLETE") && (
+            <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
+              <div>
+                <p className="text-sm font-medium">Reset Tournament</p>
+                <p className="text-sm text-muted-foreground">
+                  Delete all matches and return to pending. Participants are preserved.
+                </p>
+              </div>
+              <ResetTournamentDialog
+                tournamentId={tournamentId}
+                slug={tournament.slug}
+                variant="danger-zone"
+              />
+            </div>
+          )}
+          <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
+            <div>
+              <p className="text-sm font-medium">Delete Tournament</p>
+              <p className="text-sm text-muted-foreground">
+                Permanently delete this tournament and all associated data.
+              </p>
+            </div>
+            <DeleteTournamentDialog tournamentId={tournamentId} />
+          </div>
+        </div>
       </section>
     </div>
   );

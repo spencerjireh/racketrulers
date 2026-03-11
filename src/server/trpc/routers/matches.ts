@@ -734,6 +734,29 @@ export const matchesRouter = createTRPCRouter({
       return fetchBracketData(ctx.prisma, input.tournamentId);
     }),
 
+  getProgress: baseProcedure
+    .input(z.object({ tournamentId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const tournament = await ctx.prisma.tournament.findFirst({
+        where: { id: input.tournamentId, deletedAt: null },
+        select: { status: true },
+      });
+      if (!tournament) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [total, completed] = await Promise.all([
+        ctx.prisma.match.count({
+          where: { tournamentId: input.tournamentId },
+        }),
+        ctx.prisma.match.count({
+          where: {
+            tournamentId: input.tournamentId,
+            status: { in: ["COMPLETE", "FORFEIT"] },
+          },
+        }),
+      ]);
+      return { total, completed };
+    }),
+
   getStandings: baseProcedure
     .input(
       z.object({

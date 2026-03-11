@@ -4,8 +4,10 @@ import { useTRPC } from "@/lib/trpc/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { toast } from "sonner";
+import { ResetTournamentDialog } from "@/components/tournaments/reset-tournament-dialog";
 
 interface TournamentAdminBarProps {
   status: "PENDING" | "UNDERWAY" | "COMPLETE";
@@ -27,6 +29,11 @@ export function TournamentAdminBar({
     trpc.participants.list.queryOptions({ tournamentId })
   );
   const participantCount = participants?.length ?? initialParticipantCount;
+
+  const { data: progress } = useQuery({
+    ...trpc.matches.getProgress.queryOptions({ tournamentId }),
+    enabled: status === "UNDERWAY",
+  });
 
   const startMutation = useMutation(
     trpc.tournaments.start.mutationOptions({
@@ -68,11 +75,26 @@ export function TournamentAdminBar({
   }
 
   if (status === "UNDERWAY") {
+    const percent = progress && progress.total > 0
+      ? Math.round((progress.completed / progress.total) * 100)
+      : 0;
+
     return (
-      <div className="rounded-lg bg-muted px-4 py-3">
-        <p className="text-sm text-muted-foreground">
-          Report scores until the tournament is complete.
-        </p>
+      <div className="rounded-lg bg-muted px-4 py-3 space-y-2">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 space-y-1.5">
+            <p className="text-sm text-muted-foreground">
+              {progress
+                ? `${progress.completed} of ${progress.total} matches completed (${percent}%)`
+                : "Loading progress..."}
+            </p>
+            {progress && <Progress value={percent} className="h-2" />}
+          </div>
+          <ResetTournamentDialog
+            tournamentId={tournamentId}
+            slug={slug}
+          />
+        </div>
       </div>
     );
   }

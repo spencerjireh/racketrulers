@@ -412,6 +412,30 @@ export const tournamentsRouter = createTRPCRouter({
       });
     }),
 
+  reset: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
+
+      if (tournament.status !== "UNDERWAY" && tournament.status !== "COMPLETE") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Only started or completed tournaments can be reset",
+        });
+      }
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.match.deleteMany({ where: { tournamentId: input.id } });
+        await tx.tournament.update({
+          where: { id: input.id },
+          data: { status: "PENDING" },
+        });
+      }, { maxWait: 10000, timeout: 20000 });
+
+      emitToTournament(input.id, "tournament:updated", { status: "PENDING" });
+      return { success: true };
+    }),
+
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {

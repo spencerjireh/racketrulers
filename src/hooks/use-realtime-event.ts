@@ -21,6 +21,7 @@ export function useRealtimeTournament(tournamentId: string) {
       queryClient.invalidateQueries(trpc.matches.getStandings.queryFilter());
       queryClient.invalidateQueries(trpc.matches.getBracketData.queryFilter());
       queryClient.invalidateQueries(trpc.matches.getBracketDataPublic.queryFilter());
+      queryClient.invalidateQueries(trpc.matches.getProgress.queryFilter());
     });
 
     const unsub2 = on("schedule:updated", () => {
