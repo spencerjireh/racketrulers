@@ -15,7 +15,11 @@ import { WeekView } from "./week-view";
 import { BookingConfirmation } from "./booking-confirmation";
 import { toast } from "sonner";
 
-export function BookingPage() {
+interface BookingPageProps {
+  slug: string;
+}
+
+export function BookingPage({ slug }: BookingPageProps) {
   const trpc = useTRPC();
   const [view, setView] = useState<"month" | "week">("month");
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -31,7 +35,7 @@ export function BookingPage() {
   const [weekStart, setWeekStart] = useState(() => getMonday(now));
 
   const { data: coach, isLoading: coachLoading } = useQuery(
-    trpc.coach.getPublic.queryOptions()
+    trpc.coach.getPublic.queryOptions({ slug })
   );
 
   const from = useMemo(() => toLocalDateStr(new Date()), []);
@@ -43,7 +47,7 @@ export function BookingPage() {
   }, []);
 
   const { data: availableSlots } = useQuery({
-    ...trpc.bookings.getAvailableSlots.queryOptions({ from, to }),
+    ...trpc.bookings.getAvailableSlots.queryOptions({ slug, from, to }),
     enabled: !!coach,
   });
 
@@ -96,6 +100,7 @@ export function BookingPage() {
       return;
 
     createBooking.mutate({
+      slug,
       date: selectedDate,
       startTime: selectedSlot,
       bookerName: bookerName.trim(),

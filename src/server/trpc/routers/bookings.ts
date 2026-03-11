@@ -1,20 +1,20 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { baseProcedure, createTRPCRouter } from "../init";
-import { COACH_SLUG } from "@/lib/constants";
 import { toLocalDateStr } from "@/lib/utils";
 
 export const bookingsRouter = createTRPCRouter({
   getAvailableSlots: baseProcedure
     .input(
       z.object({
+        slug: z.string(),
         from: z.string(),
         to: z.string(),
       })
     )
     .query(async ({ ctx, input }) => {
       const profile = await ctx.prisma.coachProfile.findUnique({
-        where: { slug: COACH_SLUG },
+        where: { slug: input.slug },
         include: { availability: true },
       });
       if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
@@ -98,6 +98,7 @@ export const bookingsRouter = createTRPCRouter({
   create: baseProcedure
     .input(
       z.object({
+        slug: z.string(),
         date: z.string(),
         startTime: z.string().regex(/^\d{2}:\d{2}$/),
         bookerName: z.string().min(1, "Name is required"),
@@ -107,7 +108,7 @@ export const bookingsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const profile = await ctx.prisma.coachProfile.findUnique({
-        where: { slug: COACH_SLUG },
+        where: { slug: input.slug },
         include: { availability: true },
       });
       if (!profile) throw new TRPCError({ code: "NOT_FOUND" });

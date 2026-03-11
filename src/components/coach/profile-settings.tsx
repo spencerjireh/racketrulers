@@ -14,7 +14,6 @@ const DURATION_PRESETS = [30, 45, 60, 90, 120];
 interface ProfileSettingsProps {
   profile: {
     slug: string;
-    displayName: string;
     sessionDurationMinutes: number;
   };
 }
@@ -22,7 +21,6 @@ interface ProfileSettingsProps {
 export function ProfileSettings({ profile }: ProfileSettingsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [displayName, setDisplayName] = useState(profile.displayName);
   const [duration, setDuration] = useState(profile.sessionDurationMinutes);
   const [copied, setCopied] = useState(false);
   const [customDuration, setCustomDuration] = useState(
@@ -41,14 +39,11 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    updateProfile.mutate({
-      displayName: displayName.trim(),
-      sessionDurationMinutes: duration,
-    });
+    updateProfile.mutate({ sessionDurationMinutes: duration });
   }
 
   async function handleCopyUrl() {
-    const url = `${window.location.origin}/book`;
+    const url = `${window.location.origin}/book/${profile.slug}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("URL copied to clipboard");
@@ -61,7 +56,7 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
         <Label>Booking URL</Label>
         <div className="flex items-center gap-2">
           <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md truncate">
-            /book
+            /book/{profile.slug}
           </code>
           <Button
             type="button"
@@ -77,15 +72,6 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
             )}
           </Button>
         </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="edit-name">Display Name</Label>
-        <Input
-          id="edit-name"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          required
-        />
       </div>
       <div className="space-y-2">
         <Label>Session Duration (minutes)</Label>

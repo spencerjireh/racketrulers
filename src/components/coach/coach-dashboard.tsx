@@ -40,18 +40,6 @@ export function CoachDashboard() {
     return <LoadingState />;
   }
 
-  if (!profile) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Coach profile not found. Please run the seed script.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   function toggleSection(id: SectionId) {
     setOpenSections((prev) => {
       const next = new Set(prev);
@@ -91,8 +79,8 @@ export function CoachDashboard() {
             <CollapsibleContent>
               <Separator />
               <CardContent className="pt-6">
-                {id === "profile" && <ProfileSettings key={profile.slug} profile={profile} />}
-                {id === "availability" && (
+                {id === "profile" && profile && <ProfileSettings key={profile.slug} profile={profile} />}
+                {id === "availability" && profile && (
                   <AvailabilityEditor
                     initialSlots={profile.availability.map((a) => ({
                       dayOfWeek: a.dayOfWeek,

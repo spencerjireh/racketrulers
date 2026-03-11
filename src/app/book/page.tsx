@@ -1,11 +1,8 @@
-import { BookingPage } from "@/components/coach/booking-page";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 
-export default function PublicBookingPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <BookingPage />
-      </div>
-    </div>
-  );
+export default async function BookPage() {
+  const coach = await prisma.coachProfile.findFirst({ select: { slug: true } });
+  if (!coach) redirect("/");
+  redirect(`/book/${coach.slug}`);
 }

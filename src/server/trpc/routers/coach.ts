@@ -2,13 +2,9 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "@prisma/client";
 import { baseProcedure, protectedProcedure, createTRPCRouter } from "../init";
-import { stripUndefined } from "@/lib/utils";
-import { COACH_SLUG } from "@/lib/constants";
 
-async function getCoachProfile(prisma: PrismaClient) {
-  const profile = await prisma.coachProfile.findUnique({
-    where: { slug: COACH_SLUG },
-  });
+async function requireCoachProfile(prisma: PrismaClient) {
+  const profile = await prisma.coachProfile.findFirst();
   if (!profile) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -20,8 +16,7 @@ async function getCoachProfile(prisma: PrismaClient) {
 
 export const coachRouter = createTRPCRouter({
   getProfile: protectedProcedure.query(async ({ ctx }) => {
-    const profile = await ctx.prisma.coachProfile.findUnique({
-      where: { slug: COACH_SLUG },
+    return ctx.prisma.coachProfile.findFirst({
       include: {
         availability: { orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }] },
         bookings: {
@@ -34,27 +29,20 @@ export const coachRouter = createTRPCRouter({
         },
       },
     });
-    return profile;
   }),
 
   updateProfile: protectedProcedure
     .input(
       z.object({
-        displayName: z.string().min(1).optional(),
-        sessionDurationMinutes: z.number().int().min(15).max(480).optional(),
+        sessionDurationMinutes: z.number().int().min(15).max(480),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const profile = await getCoachProfile(ctx.prisma);
-
-      const updateData = stripUndefined({
-        displayName: input.displayName,
-        sessionDurationMinutes: input.sessionDurationMinutes,
-      });
+      const profile = await requireCoachProfile(ctx.prisma);
 
       return ctx.prisma.coachProfile.update({
         where: { id: profile.id },
-        data: updateData,
+        data: { sessionDurationMinutes: input.sessionDurationMinutes },
       });
     }),
 
@@ -71,7 +59,7 @@ export const coachRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const profile = await getCoachProfile(ctx.prisma);
+      const profile = await requireCoachProfile(ctx.prisma);
 
       await ctx.prisma.$transaction([
         ctx.prisma.coachAvailability.deleteMany({ where: { coachProfileId: profile.id } }),
@@ -94,7 +82,7 @@ export const coachRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const profile = await getCoachProfile(ctx.prisma);
+      const profile = await requireCoachProfile(ctx.prisma);
 
       const dateFilter: Record<string, Date> = {};
       if (input.from) dateFilter.gte = new Date(input.from);
@@ -127,7 +115,7 @@ export const coachRouter = createTRPCRouter({
   cancelBooking: protectedProcedure
     .input(z.object({ bookingId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const profile = await getCoachProfile(ctx.prisma);
+      const profile = await requireCoachProfile(ctx.prisma);
 
       const booking = await ctx.prisma.booking.findFirst({
         where: { id: input.bookingId, coachProfileId: profile.id },
@@ -140,18 +128,20 @@ export const coachRouter = createTRPCRouter({
       });
     }),
 
-  getPublic: baseProcedure.query(async ({ ctx }) => {
-    const coach = await ctx.prisma.coachProfile.findUnique({
-      where: { slug: COACH_SLUG },
-      select: {
-        id: true,
-        displayName: true,
-        slug: true,
-        sessionDurationMinutes: true,
-        _count: { select: { availability: true } },
-      },
-    });
-    if (!coach) throw new TRPCError({ code: "NOT_FOUND" });
-    return coach;
-  }),
+  getPublic: baseProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const coach = await ctx.prisma.coachProfile.findUnique({
+        where: { slug: input.slug },
+        select: {
+          id: true,
+          displayName: true,
+          slug: true,
+          sessionDurationMinutes: true,
+          _count: { select: { availability: true } },
+        },
+      });
+      if (!coach) throw new TRPCError({ code: "NOT_FOUND" });
+      return coach;
+    }),
 });

@@ -1,5 +1,3 @@
-export const COACH_SLUG = "michael";
-
 export interface ScheduleConfig {
   slotDuration: number;
   dayStartHour: number;

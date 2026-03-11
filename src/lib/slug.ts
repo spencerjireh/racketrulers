@@ -7,25 +7,39 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export async function generateUniqueSlug(
+export async function generateUniqueSlugFor(
   name: string,
-  prisma: PrismaClient
+  exists: (slug: string) => Promise<boolean>
 ): Promise<string> {
   const base = slugify(name);
   if (!base) {
     throw new Error("Name must contain at least one alphanumeric character");
   }
 
-  const existing = await prisma.tournament.findUnique({ where: { slug: base } });
-  if (!existing) return base;
+  if (!(await exists(base))) return base;
 
   let suffix = 2;
   while (true) {
     const candidate = `${base}-${suffix}`;
-    const found = await prisma.tournament.findUnique({
-      where: { slug: candidate },
-    });
-    if (!found) return candidate;
+    if (!(await exists(candidate))) return candidate;
     suffix++;
   }
+}
+
+export async function generateUniqueSlug(
+  name: string,
+  prisma: PrismaClient
+): Promise<string> {
+  return generateUniqueSlugFor(name, (slug) =>
+    prisma.tournament.findUnique({ where: { slug } }).then(Boolean)
+  );
+}
+
+export async function generateUniqueCoachSlug(
+  name: string,
+  prisma: PrismaClient
+): Promise<string> {
+  return generateUniqueSlugFor(name, (slug) =>
+    prisma.coachProfile.findUnique({ where: { slug } }).then(Boolean)
+  );
 }

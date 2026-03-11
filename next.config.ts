@@ -24,11 +24,6 @@ const nextConfig: NextConfig = {
         destination: "/dashboard/tournaments/:path*",
         permanent: true,
       },
-      {
-        source: "/book/:slug",
-        destination: "/book",
-        permanent: true,
-      },
     ];
   },
 };
