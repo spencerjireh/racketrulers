@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerCaller } from "@/lib/trpc/server";
+import { prisma } from "@/lib/prisma";
 
 export default async function ManageTournamentLayout({
   params,
@@ -8,12 +8,13 @@ export default async function ManageTournamentLayout({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const caller = await createServerCaller();
 
-  let tournament;
-  try {
-    tournament = await caller.tournaments.getById({ id });
-  } catch {
+  const tournament = await prisma.tournament.findFirst({
+    where: { id, deletedAt: null },
+    select: { slug: true },
+  });
+
+  if (!tournament) {
     redirect("/dashboard/tournaments");
   }
 
