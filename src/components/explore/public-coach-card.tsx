@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Globe, CalendarDays } from "lucide-react";
+import { Clock, CalendarDays } from "lucide-react";
 
 interface PublicCoachCardProps {
   coach: {
@@ -8,7 +8,6 @@ interface PublicCoachCardProps {
     displayName: string;
     slug: string;
     sessionDurationMinutes: number;
-    timezone: string;
     _count: {
       availability: number;
     };
@@ -27,10 +26,6 @@ export function PublicCoachCard({ coach }: PublicCoachCardProps) {
             <span className="inline-flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
               {coach.sessionDurationMinutes} min sessions
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Globe className="h-3.5 w-3.5" />
-              {coach.timezone}
             </span>
             <span className="inline-flex items-center gap-1">
               <CalendarDays className="h-3.5 w-3.5" />

@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { TIMEZONES, DEFAULT_SCHEDULE_CONFIG, type ScheduleConfig } from "@/lib/constants";
+import { DEFAULT_SCHEDULE_CONFIG, type ScheduleConfig } from "@/lib/constants";
 import { type ScoringConfig, DEFAULT_SCORING_CONFIG } from "@/server/lib/scoring-validation";
 
 type TournamentFormat = "ROUND_ROBIN" | "SINGLE_ELIM" | "DOUBLE_ELIM" | "SWISS";
@@ -28,7 +28,6 @@ interface TournamentSettingsFormProps {
     description: string | null;
     startDate: Date;
     endDate: Date;
-    timezone: string;
     status: string;
     format?: TournamentFormat | null;
     drawsAllowed?: boolean | null;
@@ -59,7 +58,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
   const isCompleted = tournament.status === "COMPLETE";
   const isStarted = tournament.status === "UNDERWAY" || isCompleted;
 
-  const [timezone, setTimezone] = useState(tournament.timezone);
   const [format, setFormat] = useState<TournamentFormat>(tournament.format ?? "ROUND_ROBIN");
   const [drawsAllowed, setDrawsAllowed] = useState(tournament.drawsAllowed ?? false);
 
@@ -113,7 +111,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
       description: (formData.get("description") as string) || undefined,
       startDate: formData.get("startDate") as string,
       endDate: formData.get("endDate") as string,
-      timezone,
       // Exclude locked fields when tournament is started
       ...(isStarted
         ? {}
@@ -209,22 +206,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
             disabled={isCompleted}
           />
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Timezone</Label>
-        <Select value={timezone} onValueChange={setTimezone} disabled={isCompleted}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TIMEZONES.map((tz) => (
-              <SelectItem key={tz} value={tz}>
-                {tz.replace(/_/g, " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Scoring Rules */}

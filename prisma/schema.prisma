@@ -89,7 +89,6 @@ model Tournament {
   description String?
   bannerUrl   String?          @map("banner_url")
   status      TournamentStatus @default(PENDING)
-  timezone    String           @default("America/Toronto")
   startDate   DateTime         @map("start_date")
   endDate     DateTime         @map("end_date")
 
@@ -237,7 +236,6 @@ model CoachProfile {
   displayName            String @map("display_name")
   slug                   String @unique
   sessionDurationMinutes Int    @default(60) @map("session_duration_minutes")
-  timezone               String @default("America/Toronto")
 
   availability CoachAvailability[]
   bookings     Booking[]

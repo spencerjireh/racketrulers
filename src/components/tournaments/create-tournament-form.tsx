@@ -15,14 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TIMEZONES } from "@/lib/constants";
-
 type TournamentFormat = "ROUND_ROBIN" | "SINGLE_ELIM" | "DOUBLE_ELIM" | "SWISS";
 
 export function CreateTournamentForm() {
   const router = useRouter();
   const trpc = useTRPC();
-  const [timezone, setTimezone] = useState("Asia/Manila");
   const [format, setFormat] = useState<TournamentFormat>("ROUND_ROBIN");
   const [error, setError] = useState("");
 
@@ -57,7 +54,6 @@ export function CreateTournamentForm() {
         description,
         startDate,
         endDate,
-        timezone,
         format,
       });
       router.push(`/tournaments/${tournament.slug}/participants`);
@@ -111,22 +107,6 @@ export function CreateTournamentForm() {
           <Label htmlFor="endDate">End Date</Label>
           <Input id="endDate" name="endDate" type="date" />
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Timezone</Label>
-        <Select value={timezone} onValueChange={setTimezone}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TIMEZONES.map((tz) => (
-              <SelectItem key={tz} value={tz}>
-                {tz.replace(/_/g, " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <Button type="submit" disabled={createTournament.isPending}>

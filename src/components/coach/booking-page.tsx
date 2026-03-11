@@ -109,7 +109,7 @@ export function BookingPage() {
       <div>
         <h1 className="text-2xl font-bold">{coach.displayName}</h1>
         <p className="text-sm text-muted-foreground">
-          {coach.sessionDurationMinutes}-minute sessions | {coach.timezone}
+          {coach.sessionDurationMinutes}-minute sessions
         </p>
       </div>
 

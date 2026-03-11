@@ -42,7 +42,6 @@ export const coachRouter = createTRPCRouter({
       z.object({
         displayName: z.string().min(1).optional(),
         sessionDurationMinutes: z.number().int().min(15).max(480).optional(),
-        timezone: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -51,7 +50,6 @@ export const coachRouter = createTRPCRouter({
       const updateData = stripUndefined({
         displayName: input.displayName,
         sessionDurationMinutes: input.sessionDurationMinutes,
-        timezone: input.timezone,
       });
 
       return ctx.prisma.coachProfile.update({
@@ -150,7 +148,6 @@ export const coachRouter = createTRPCRouter({
         displayName: true,
         slug: true,
         sessionDurationMinutes: true,
-        timezone: true,
         _count: { select: { availability: true } },
       },
     });

@@ -6,16 +6,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { TIMEZONES } from "@/lib/constants";
 
 const DURATION_PRESETS = [30, 45, 60, 90, 120];
 
@@ -24,7 +16,6 @@ interface ProfileSettingsProps {
     slug: string;
     displayName: string;
     sessionDurationMinutes: number;
-    timezone: string;
   };
 }
 
@@ -33,7 +24,6 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
   const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [duration, setDuration] = useState(profile.sessionDurationMinutes);
-  const [timezone, setTimezone] = useState(profile.timezone);
   const [copied, setCopied] = useState(false);
   const [customDuration, setCustomDuration] = useState(
     !DURATION_PRESETS.includes(profile.sessionDurationMinutes)
@@ -54,7 +44,6 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
     updateProfile.mutate({
       displayName: displayName.trim(),
       sessionDurationMinutes: duration,
-      timezone,
     });
   }
 
@@ -134,21 +123,6 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
             className="w-32 mt-2"
           />
         )}
-      </div>
-      <div className="space-y-2">
-        <Label>Timezone</Label>
-        <Select value={timezone} onValueChange={setTimezone}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TIMEZONES.map((tz) => (
-              <SelectItem key={tz} value={tz}>
-                {tz}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
       <Button type="submit" disabled={updateProfile.isPending}>
         {updateProfile.isPending ? "Saving..." : "Save Changes"}

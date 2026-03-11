@@ -54,7 +54,6 @@ export const tournamentsRouter = createTRPCRouter({
         format: z.enum(["ROUND_ROBIN", "SINGLE_ELIM", "DOUBLE_ELIM", "SWISS"]).optional(),
         startDate: z.string(),
         endDate: z.string(),
-        timezone: z.string().default("Asia/Manila"),
         thirdPlaceMatch: z.boolean().optional(),
         grandFinalsModifier: z.string().optional(),
       })
@@ -79,7 +78,6 @@ export const tournamentsRouter = createTRPCRouter({
           format: input.format || null,
           startDate: start,
           endDate: end,
-          timezone: input.timezone,
           ownerId: ctx.userId,
           status: "PENDING",
           thirdPlaceMatch: input.thirdPlaceMatch ?? false,
@@ -136,7 +134,6 @@ export const tournamentsRouter = createTRPCRouter({
         drawsAllowed: z.boolean().optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
-        timezone: z.string().optional(),
         thirdPlaceMatch: z.boolean().optional(),
         grandFinalsModifier: z.string().optional(),
         pointsConfig: z
@@ -200,7 +197,6 @@ export const tournamentsRouter = createTRPCRouter({
         description: data.description,
         format: data.format,
         drawsAllowed: data.drawsAllowed,
-        timezone: data.timezone,
         thirdPlaceMatch: data.thirdPlaceMatch,
         grandFinalsModifier: data.grandFinalsModifier,
         pointsConfig: data.pointsConfig,

@@ -25,7 +25,6 @@ async function main() {
       displayName: "Michael",
       slug: COACH_SLUG,
       sessionDurationMinutes: 60,
-      timezone: "Asia/Manila",
     },
   });
 
