@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -36,28 +36,62 @@ export function ScoreEntryDialog({
   currentSetScores,
   isPending,
 }: ScoreEntryDialogProps) {
-  const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
-  const [sets, setSets] = useState<{ t1: string; t2: string }[]>([]);
-  const [error, setError] = useState("");
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Enter Set Scores</SheetTitle>
+          <SheetDescription>Enter the set scores for this match.</SheetDescription>
+        </SheetHeader>
+        {open && (
+          <ScoreEntryForm
+            scoringConfig={scoringConfig}
+            currentSetScores={currentSetScores}
+            team1={team1}
+            team2={team2}
+            onSubmit={onSubmit}
+            onForfeit={onForfeit}
+            onOpenChange={onOpenChange}
+            isPending={isPending}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
-  useEffect(() => {
-    if (open) {
-      setError("");
-      if (currentSetScores && currentSetScores.length > 0) {
-        setSets(
-          currentSetScores.map((s) => ({
-            t1: s.team1.toString(),
-            t2: s.team2.toString(),
-          }))
-        );
-      } else {
-        // Initialize with empty sets
-        setSets(
-          Array.from({ length: config.totalSets }, () => ({ t1: "", t2: "" }))
-        );
-      }
+function ScoreEntryForm({
+  scoringConfig,
+  currentSetScores,
+  team1,
+  team2,
+  onSubmit,
+  onForfeit,
+  onOpenChange,
+  isPending,
+}: {
+  scoringConfig: ScoringConfig;
+  currentSetScores?: SetScore[] | null;
+  team1: { id: string; name: string } | null;
+  team2: { id: string; name: string } | null;
+  onSubmit: (data: { setScores: SetScore[] }) => void;
+  onForfeit?: (winnerId: string) => void;
+  onOpenChange: (open: boolean) => void;
+  isPending: boolean;
+}) {
+  const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
+
+  const [sets, setSets] = useState<{ t1: string; t2: string }[]>(() => {
+    if (currentSetScores && currentSetScores.length > 0) {
+      return currentSetScores.map((s) => ({
+        t1: s.team1.toString(),
+        t2: s.team2.toString(),
+      }));
     }
-  }, [open, currentSetScores, config.totalSets]);
+    return Array.from({ length: config.totalSets }, () => ({ t1: "", t2: "" }));
+  });
+
+  const [error, setError] = useState("");
 
   function updateSet(index: number, field: "t1" | "t2", value: string) {
     setSets((prev) => {
@@ -70,7 +104,6 @@ export function ScoreEntryDialog({
 
   const setsToWin = Math.ceil(config.totalSets / 2);
 
-  // Single computation for running tally and per-index sets-won (used for disabling rows)
   const { tally, matchDecided, setsWonPerIndex } = useMemo(() => {
     const t = { team1: 0, team2: 0 };
     let decided = false;
@@ -97,7 +130,6 @@ export function ScoreEntryDialog({
     e.preventDefault();
     setError("");
 
-    // Collect filled sets
     const filledSets: SetScore[] = [];
     for (const set of sets) {
       const t1 = parseInt(set.t1);
@@ -119,113 +151,105 @@ export function ScoreEntryDialog({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Enter Set Scores</SheetTitle>
-          <SheetDescription>Enter the set scores for this match.</SheetDescription>
-        </SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
-          {/* Team headers */}
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-medium">
-            <span className="text-center truncate">
-              {team1?.name ?? "TBD"}
-            </span>
-            <span className="text-muted-foreground">vs</span>
-            <span className="text-center truncate">
-              {team2?.name ?? "TBD"}
-            </span>
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
+      {/* Team headers */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-medium">
+        <span className="text-center truncate">
+          {team1?.name ?? "TBD"}
+        </span>
+        <span className="text-muted-foreground">vs</span>
+        <span className="text-center truncate">
+          {team2?.name ?? "TBD"}
+        </span>
+      </div>
 
-          {/* Set rows */}
-          <div className="space-y-2">
-            {sets.map((set, i) => {
-              const before = setsWonPerIndex[i] ?? { team1: 0, team2: 0 };
-              const setDisabled =
-                before.team1 === setsToWin ||
-                before.team2 === setsToWin;
+      {/* Set rows */}
+      <div className="space-y-2">
+        {sets.map((set, i) => {
+          const before = setsWonPerIndex[i] ?? { team1: 0, team2: 0 };
+          const setDisabled =
+            before.team1 === setsToWin ||
+            before.team2 === setsToWin;
 
-              return (
-                <div
-                  key={i}
-                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"
-                >
-                  <Input
-                    type="number"
-                    min={0}
-                    value={set.t1}
-                    onChange={(e) => updateSet(i, "t1", e.target.value)}
-                    className="text-center h-10"
-                    placeholder="0"
-                    disabled={setDisabled}
-                  />
-                  <Label className="text-xs text-muted-foreground w-12 text-center">
-                    Set {i + 1}
-                  </Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={set.t2}
-                    onChange={(e) => updateSet(i, "t2", e.target.value)}
-                    className="text-center h-10"
-                    placeholder="0"
-                    disabled={setDisabled}
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Running tally */}
-          <div className="text-center text-sm">
-            <span className="font-mono font-bold">
-              {tally.team1} - {tally.team2}
-            </span>
-            <span className="text-muted-foreground ml-2">
-              (sets{matchDecided ? " -- match decided" : ""})
-            </span>
-          </div>
-
-          {/* Validation error */}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          {onForfeit && team1 && team2 && (
-            <div className="flex flex-wrap gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={() => onForfeit(team1.id)}
-              >
-                Forfeit: {team2.name}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={() => onForfeit(team2.id)}
-              >
-                Forfeit: {team1.name}
-              </Button>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
+          return (
+            <div
+              key={i}
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"
             >
-              Close
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Saving..." : "Save Score"}
-            </Button>
-          </div>
-        </form>
-      </SheetContent>
-    </Sheet>
+              <Input
+                type="number"
+                min={0}
+                value={set.t1}
+                onChange={(e) => updateSet(i, "t1", e.target.value)}
+                className="text-center h-10"
+                placeholder="0"
+                disabled={setDisabled}
+              />
+              <Label className="text-xs text-muted-foreground w-12 text-center">
+                Set {i + 1}
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={set.t2}
+                onChange={(e) => updateSet(i, "t2", e.target.value)}
+                className="text-center h-10"
+                placeholder="0"
+                disabled={setDisabled}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Running tally */}
+      <div className="text-center text-sm">
+        <span className="font-mono font-bold">
+          {tally.team1} - {tally.team2}
+        </span>
+        <span className="text-muted-foreground ml-2">
+          (sets{matchDecided ? " -- match decided" : ""})
+        </span>
+      </div>
+
+      {/* Validation error */}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {onForfeit && team1 && team2 && (
+        <div className="flex flex-wrap gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => onForfeit(team1.id)}
+          >
+            Forfeit: {team2.name}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => onForfeit(team2.id)}
+          >
+            Forfeit: {team1.name}
+          </Button>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => onOpenChange(false)}
+        >
+          Close
+        </Button>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Saving..." : "Save Score"}
+        </Button>
+      </div>
+    </form>
   );
 }

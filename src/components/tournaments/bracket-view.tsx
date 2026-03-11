@@ -28,6 +28,31 @@ interface BracketViewProps {
 
 const ZOOM_LEVELS = [0.5, 0.75, 1.0];
 
+function getChampionInfo(
+  rounds: { index: number; games: MatchCardGame[] }[],
+  gameMap: Map<string, MatchCardGame>
+) {
+  if (!rounds.length) return null;
+  const finalRound = rounds[rounds.length - 1];
+  if (!finalRound.games.length) return null;
+  const finalGame = gameMap.get(finalRound.games[0].id);
+  if (!finalGame) return null;
+  if (finalGame.status !== "COMPLETE" && finalGame.status !== "FORFEIT") return null;
+
+  const { scoreParticipant1, scoreParticipant2, participant1, participant2 } = finalGame;
+  if (scoreParticipant1 == null || scoreParticipant2 == null) return null;
+
+  const champion = scoreParticipant1 > scoreParticipant2 ? participant1 : participant2;
+  const runnerUp = scoreParticipant1 > scoreParticipant2 ? participant2 : participant1;
+  if (!champion) return null;
+
+  return {
+    champion,
+    runnerUp,
+    score: `${Math.max(scoreParticipant1, scoreParticipant2)}-${Math.min(scoreParticipant1, scoreParticipant2)}`,
+  };
+}
+
 export function BracketView({
   tournamentId,
   interactive = false,
@@ -111,6 +136,9 @@ export function BracketView({
     queryClient.invalidateQueries(
       trpc.matches.getStandings.queryFilter({ tournamentId })
     );
+    queryClient.invalidateQueries(
+      trpc.matches.getProgress.queryFilter({ tournamentId })
+    );
   };
 
   const {
@@ -146,6 +174,11 @@ export function BracketView({
 
   const slotHeight = CARD_HEIGHT + ROW_GAP;
   const colWidth = CARD_WIDTH + COL_GAP;
+
+  const championInfo = getChampionInfo(
+    rounds.map((r) => ({ index: r.index, games: r.games.map((g) => gameMap.get(g.id)!).filter(Boolean) })),
+    gameMap
+  );
 
   return (
     <TooltipProvider>
@@ -289,6 +322,28 @@ export function BracketView({
             })}
           </div>
         </div>
+
+        {/* Champion banner */}
+        {championInfo && (
+          <div className="mt-4 rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Champion</p>
+                <p className="text-lg font-semibold">{championInfo.champion.name}</p>
+              </div>
+              {championInfo.runnerUp && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Runner-up</p>
+                  <p className="text-lg font-semibold text-muted-foreground">{championInfo.runnerUp.name}</p>
+                </div>
+              )}
+              <div className="ml-auto">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Final Score</p>
+                <p className="text-lg font-semibold tabular-nums">{championInfo.score}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Score entry dialog (interactive mode only) */}
         {interactive && (

@@ -110,7 +110,7 @@ export function BracketPreview({
     const rounds = Array.from({ length: totalRounds }, (_, i) => ({
       index: i,
       label: getBracketRoundLabel(i, totalRounds),
-      games: (roundsMap.get(i) ?? []).map(({ id, game }, gi) => ({
+      games: (roundsMap.get(i) ?? []).map(({ id, game }) => ({
         id,
         feederMatch1Id:
           game.feederIndex1 != null ? `preview-${game.feederIndex1}` : null,

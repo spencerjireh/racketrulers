@@ -148,7 +148,7 @@ describe("generateSchedule", () => {
         participant2Id: null,
         status: "COMPLETE",
       }),
-      makeGame("real", { team1Id: "t2", team2Id: "t3" }),
+      makeGame("real", { participant1Id: "t2", participant2Id: "t3" }),
     ];
     const config = makeConfig();
 

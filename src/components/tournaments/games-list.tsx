@@ -59,6 +59,9 @@ export function GamesList({
     queryClient.invalidateQueries(
       trpc.matches.getStandings.queryFilter()
     );
+    queryClient.invalidateQueries(
+      trpc.matches.getProgress.queryFilter({ tournamentId })
+    );
   };
 
   const {

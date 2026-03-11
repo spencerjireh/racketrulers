@@ -10,7 +10,7 @@ import { toast } from "sonner";
 interface PointsConfigFormProps {
   tournamentId: string;
   pointsConfig: { win: number; draw: number; loss: number };
-  disabled: boolean;
+  disabled?: boolean;
 }
 
 export function PointsConfigForm({

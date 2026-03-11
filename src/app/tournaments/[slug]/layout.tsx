@@ -44,26 +44,24 @@ export default async function PublicTournamentLayout({
   const isOwner = session?.user?.id === tournament.ownerId;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-6 space-y-4">
-        <TournamentHeader
-          name={tournament.name}
-          startDate={tournament.startDate}
-          endDate={tournament.endDate}
+    <div className="mx-auto max-w-5xl py-6 space-y-4">
+      <TournamentHeader
+        name={tournament.name}
+        startDate={tournament.startDate}
+        endDate={tournament.endDate}
+        status={tournament.status}
+      />
+      {isOwner && (
+        <TournamentAdminBar
           status={tournament.status}
+          participantCount={tournament.participants.length}
+          slug={slug}
+          tournamentId={tournament.id}
         />
-        {isOwner && (
-          <TournamentAdminBar
-            status={tournament.status}
-            participantCount={tournament.participants.length}
-            slug={slug}
-            tournamentId={tournament.id}
-          />
-        )}
-        <TournamentNav slug={slug} isOwner={isOwner} />
-        <RealtimeWrapper tournamentId={tournament.id} />
-        {children}
-      </div>
+      )}
+      <TournamentNav slug={slug} isOwner={isOwner} />
+      <RealtimeWrapper tournamentId={tournament.id} />
+      {children}
     </div>
   );
 }
