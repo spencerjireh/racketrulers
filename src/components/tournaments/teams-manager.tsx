@@ -126,6 +126,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]">Seed</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Captain</TableHead>
                 <TableHead>Matches</TableHead>
@@ -135,6 +136,7 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
             <TableBody>
               {participants.map((p) => (
                 <TableRow key={p.id}>
+                  <TableCell className="text-muted-foreground">{p.seed}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>{p.captainName || "-"}</TableCell>
                   <TableCell>
