@@ -108,12 +108,40 @@ export const bookingsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const profile = await ctx.prisma.coachProfile.findUnique({
         where: { slug: COACH_SLUG },
+        include: { availability: true },
       });
       if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Calculate end time
+      // Validate slot falls within availability windows
+      const bookingDate = new Date(input.date + "T00:00:00");
+      const jsDay = bookingDate.getDay();
+      const schemaDay = jsDay === 0 ? 6 : jsDay - 1;
+      const dayAvailability = profile.availability.filter(
+        (a) => a.dayOfWeek === schemaDay
+      );
+
       const [startH, startM] = input.startTime.split(":").map(Number);
-      const totalMinutes = startH * 60 + startM + profile.sessionDurationMinutes;
+      const requestedStart = startH * 60 + startM;
+      const requestedEnd = requestedStart + profile.sessionDurationMinutes;
+
+      const withinAvailability = dayAvailability.some((window) => {
+        const [wStartH, wStartM] = window.startTime.split(":").map(Number);
+        const [wEndH, wEndM] = window.endTime.split(":").map(Number);
+        return (
+          requestedStart >= wStartH * 60 + wStartM &&
+          requestedEnd <= wEndH * 60 + wEndM
+        );
+      });
+
+      if (!withinAvailability) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Requested time is outside availability",
+        });
+      }
+
+      // Calculate end time
+      const totalMinutes = requestedEnd;
       const endH = Math.floor(totalMinutes / 60);
       const endM = totalMinutes % 60;
       const endTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;

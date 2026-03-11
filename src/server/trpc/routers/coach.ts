@@ -98,11 +98,14 @@ export const coachRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const profile = await getCoachProfile(ctx.prisma);
 
+      const dateFilter: Record<string, Date> = {};
+      if (input.from) dateFilter.gte = new Date(input.from);
+      if (input.to) dateFilter.lte = new Date(input.to);
+
       const where = {
         coachProfileId: profile.id,
         ...(input.status ? { status: input.status } : {}),
-        ...(input.from ? { date: { gte: new Date(input.from) } } : {}),
-        ...(input.to ? { date: { lte: new Date(input.to) } } : {}),
+        ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
       };
 
       const [bookings, totalCount] = await Promise.all([

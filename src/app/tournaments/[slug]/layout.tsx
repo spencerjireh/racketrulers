@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
-import { createServerCaller } from "@/lib/trpc/server";
+import { notFound } from "next/navigation";
+import { TRPCError } from "@trpc/server";
+import { getTournamentBySlug } from "@/lib/tournament-loader";
 import { TournamentHeader } from "@/components/public/tournament-header";
 import { TournamentNav } from "@/components/public/tournament-nav";
 import { TournamentAdminBar } from "@/components/public/tournament-admin-bar";
@@ -12,9 +14,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const caller = await createServerCaller();
   try {
-    const tournament = await caller.tournaments.getBySlug({ slug });
+    const tournament = await getTournamentBySlug(slug);
     return { title: tournament.name };
   } catch {
     return { title: "Tournament" };
@@ -29,8 +30,16 @@ export default async function PublicTournamentLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [session, caller] = await Promise.all([auth(), createServerCaller()]);
-  const tournament = await caller.tournaments.getBySlug({ slug });
+
+  let tournament;
+  try {
+    tournament = await getTournamentBySlug(slug);
+  } catch (e) {
+    if (e instanceof TRPCError && e.code === "NOT_FOUND") notFound();
+    throw e;
+  }
+
+  const session = await auth();
 
   const isOwner = session?.user?.id === tournament.ownerId;
 

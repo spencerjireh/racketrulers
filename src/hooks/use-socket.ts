@@ -4,17 +4,23 @@ import { useEffect, useRef, useCallback } from "react";
 import Pusher, { Channel } from "pusher-js";
 
 let pusherInstance: Pusher | null = null;
+let soketiUnavailable = false;
+let warned = false;
 
-function getPusher() {
+function getPusher(): Pusher | null {
+  if (soketiUnavailable) return null;
   if (!pusherInstance) {
     const key = process.env.NEXT_PUBLIC_SOKETI_KEY;
     const host = process.env.NEXT_PUBLIC_SOKETI_HOST;
     const port = Number(process.env.NEXT_PUBLIC_SOKETI_PORT || "443");
 
     if (!key || !host) {
-      throw new Error(
-        "Missing NEXT_PUBLIC_SOKETI_KEY or NEXT_PUBLIC_SOKETI_HOST env vars"
-      );
+      soketiUnavailable = true;
+      if (typeof window !== "undefined" && !warned) {
+        console.warn("[useSocket] Soketi env vars not set; realtime disabled");
+        warned = true;
+      }
+      return null;
     }
 
     pusherInstance = new Pusher(key, {
@@ -36,6 +42,8 @@ export function useSocket(tournamentId?: string) {
     if (!tournamentId) return;
 
     const pusher = getPusher();
+    if (!pusher) return;
+
     const channel = pusher.subscribe(`tournament.${tournamentId}`);
     channelRef.current = channel;
 

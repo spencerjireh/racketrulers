@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { createServerCaller } from "@/lib/trpc/server";
+import { getTournamentBySlug } from "@/lib/tournament-loader";
 import { PublicScheduleView } from "@/components/public/schedule-view";
 import { PublicBracketClient } from "./bracket-client";
 import { BracketPreview } from "@/components/tournaments/bracket-preview";
@@ -11,8 +11,7 @@ export default async function PublicBracketPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [session, caller] = await Promise.all([auth(), createServerCaller()]);
-  const tournament = await caller.tournaments.getBySlug({ slug });
+  const [session, tournament] = await Promise.all([auth(), getTournamentBySlug(slug)]);
 
   const isOwner = session?.user?.id === tournament.ownerId;
   const isBracketFormat =

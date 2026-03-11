@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { createServerCaller } from "@/lib/trpc/server";
+import { getTournamentBySlug } from "@/lib/tournament-loader";
 import { TeamsManager } from "@/components/tournaments/teams-manager";
 import { PublicParticipantsView } from "@/components/public/public-participants-view";
 
@@ -9,8 +9,7 @@ export default async function ParticipantsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [session, caller] = await Promise.all([auth(), createServerCaller()]);
-  const tournament = await caller.tournaments.getBySlug({ slug });
+  const [session, tournament] = await Promise.all([auth(), getTournamentBySlug(slug)]);
 
   const isOwner = session?.user?.id === tournament.ownerId;
 

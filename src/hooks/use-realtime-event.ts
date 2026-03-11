@@ -18,11 +18,9 @@ export function useRealtimeTournament(tournamentId: string) {
       queryClient.invalidateQueries(
         trpc.matches.listByTournamentPublic.queryFilter({ tournamentId })
       );
-      // Invalidate all standings queries (any tournamentId)
-      queryClient.invalidateQueries({ queryKey: [["matches", "getStandings"]] });
-      // Invalidate bracket data queries
-      queryClient.invalidateQueries({ queryKey: [["matches", "getBracketData"]] });
-      queryClient.invalidateQueries({ queryKey: [["matches", "getBracketDataPublic"]] });
+      queryClient.invalidateQueries(trpc.matches.getStandings.queryFilter());
+      queryClient.invalidateQueries(trpc.matches.getBracketData.queryFilter());
+      queryClient.invalidateQueries(trpc.matches.getBracketDataPublic.queryFilter());
     });
 
     const unsub2 = on("schedule:updated", () => {
@@ -35,9 +33,7 @@ export function useRealtimeTournament(tournamentId: string) {
     });
 
     const unsub3 = on("tournament:updated", () => {
-      queryClient.invalidateQueries({
-        queryKey: [["tournaments", "getBySlug"]],
-      });
+      queryClient.invalidateQueries(trpc.tournaments.getBySlug.queryFilter());
     });
 
     return () => {

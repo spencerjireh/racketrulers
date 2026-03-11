@@ -1,4 +1,4 @@
-import { createServerCaller } from "@/lib/trpc/server";
+import { getTournamentBySlug } from "@/lib/tournament-loader";
 import { PublicStandingsView } from "@/components/public/standings-view";
 
 export default async function PublicStandingsPage({
@@ -7,8 +7,7 @@ export default async function PublicStandingsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const caller = await createServerCaller();
-  const tournament = await caller.tournaments.getBySlug({ slug });
+  const tournament = await getTournamentBySlug(slug);
 
   return <PublicStandingsView tournamentId={tournament.id} />;
 }
