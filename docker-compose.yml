@@ -1,3 +1,5 @@
-# Docker Compose is no longer required for local development.
-# Database: Neon PostgreSQL (remote)
-# WebSocket: Soketi (remote)
+# Single-container deployment (Coolify)
+# Database: Supabase (managed Postgres)
+# WebSocket: Soketi (external)
+#
+# Coolify uses the Dockerfile directly -- this file is for reference only.
