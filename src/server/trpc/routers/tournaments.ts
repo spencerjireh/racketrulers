@@ -105,7 +105,14 @@ export const tournamentsRouter = createTRPCRouter({
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
       const tournament = await ctx.prisma.tournament.findFirst({
-        where: { slug: input.slug, deletedAt: null, status: { not: "PENDING" } },
+        where: {
+          slug: input.slug,
+          deletedAt: null,
+          OR: [
+            { status: { not: "PENDING" } },
+            ...(ctx.userId ? [{ ownerId: ctx.userId }] : []),
+          ],
+        },
         include: {
           locations: true,
           participants: { orderBy: { seed: "asc" } },
@@ -170,6 +177,18 @@ export const tournamentsRouter = createTRPCRouter({
           code: "PRECONDITION_FAILED",
           message: "Cannot update a completed tournament",
         });
+      }
+
+      // Lock structural fields once the tournament is underway
+      if (tournament.status === "UNDERWAY") {
+        const lockedFields = ["format", "drawsAllowed", "scoringConfig", "thirdPlaceMatch", "grandFinalsModifier"] as const;
+        const attempted = lockedFields.filter((f) => input[f] !== undefined);
+        if (attempted.length > 0) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Cannot change ${attempted.join(", ")} after the tournament has started`,
+          });
+        }
       }
 
       const { id, ...data } = input;

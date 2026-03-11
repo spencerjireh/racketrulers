@@ -1,3 +1,11 @@
+export function getBracketRoundLabel(roundIndex: number, totalRounds: number): string {
+  const remaining = totalRounds - roundIndex;
+  if (remaining === 1) return "Final";
+  if (remaining === 2) return "Semifinals";
+  if (remaining === 3) return "Quarterfinals";
+  return `Round ${roundIndex + 1}`;
+}
+
 export const CARD_WIDTH = 224; // w-56
 export const CARD_HEIGHT = 100; // accounts for set scores row beneath team rows
 export const COL_GAP = 48; // 3rem

@@ -4,19 +4,26 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const tabs = [
-  { label: "Bracket", segment: "bracket" },
-  { label: "Standings", segment: "standings" },
-];
+interface TournamentNavProps {
+  slug: string;
+  isOwner?: boolean;
+}
 
-export function TournamentNav({ slug }: { slug: string }) {
+export function TournamentNav({ slug, isOwner }: TournamentNavProps) {
   const pathname = usePathname();
+
+  const tabs = [
+    { label: "Bracket", segment: "bracket" },
+    { label: "Participants", segment: "participants" },
+    { label: "Standings", segment: "standings" },
+    ...(isOwner ? [{ label: "Settings", segment: "settings" }] : []),
+  ];
 
   return (
     <nav className="flex gap-1 border-b">
       {tabs.map((tab) => {
         const href = `/tournaments/${slug}/${tab.segment}`;
-        const isActive = pathname.includes(`/${tab.segment}`);
+        const isActive = pathname === `/tournaments/${slug}/${tab.segment}`;
         return (
           <Link
             key={tab.segment}

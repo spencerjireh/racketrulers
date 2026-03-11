@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, createTRPCRouter } from "../init";
+import { baseProcedure, protectedProcedure, createTRPCRouter } from "../init";
 import { verifyTournamentOwnership } from "../helpers";
 import { fisherYatesShuffle, stripUndefined } from "@/lib/utils";
 
@@ -209,7 +209,14 @@ export const participantsRouter = createTRPCRouter({
   randomizeSeeds: protectedProcedure
     .input(z.object({ tournamentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+      const tournament = await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
+
+      if (tournament.status !== "PENDING") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Seeds can only be randomized before the tournament starts",
+        });
+      }
 
       const participants = await ctx.prisma.participant.findMany({
         where: { tournamentId: input.tournamentId },
@@ -227,5 +234,60 @@ export const participantsRouter = createTRPCRouter({
       );
 
       return { randomized: shuffled.length };
+    }),
+
+  reorderSeeds: protectedProcedure
+    .input(
+      z.object({
+        tournamentId: z.string(),
+        participantIds: z.array(z.string()).min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tournament = await verifyTournamentOwnership(
+        ctx.prisma,
+        input.tournamentId,
+        ctx.userId
+      );
+
+      if (tournament.status !== "PENDING") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Seeds can only be reordered before the tournament starts",
+        });
+      }
+
+      await ctx.prisma.$transaction(
+        input.participantIds.map((id, index) =>
+          ctx.prisma.participant.update({
+            where: { id, tournamentId: input.tournamentId },
+            data: { seed: index + 1 },
+          })
+        )
+      );
+
+      return { reordered: input.participantIds.length };
+    }),
+
+  listPublic: baseProcedure
+    .input(z.object({ tournamentId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const tournament = await ctx.prisma.tournament.findFirst({
+        where: {
+          id: input.tournamentId,
+          deletedAt: null,
+          OR: [
+            { status: { not: "PENDING" } },
+            ...(ctx.userId ? [{ ownerId: ctx.userId }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      if (!tournament) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.prisma.participant.findMany({
+        where: { tournamentId: input.tournamentId },
+        orderBy: { seed: "asc" },
+        select: { id: true, name: true, seed: true },
+      });
     }),
 });

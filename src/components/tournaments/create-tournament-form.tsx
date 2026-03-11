@@ -60,7 +60,7 @@ export function CreateTournamentForm() {
         timezone,
         format,
       });
-      router.push(`/dashboard/tournaments/${tournament.id}/manage/participants`);
+      router.push(`/tournaments/${tournament.slug}/participants`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create tournament");
     }

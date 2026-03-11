@@ -91,11 +91,28 @@ export function TeamsManager({ tournamentId }: { tournamentId: string }) {
     })
   );
 
+  const shuffleSeeds = useMutation(
+    trpc.participants.randomizeSeeds.mutationOptions({
+      onSuccess: (result) => {
+        queryClient.invalidateQueries(trpc.participants.list.queryFilter({ tournamentId }));
+        toast.success(`${result.randomized} seeds shuffled`);
+      },
+      onError: (err) => toast.error(err.message),
+    })
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Participants</CardTitle>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => shuffleSeeds.mutate({ tournamentId })}
+            disabled={shuffleSeeds.isPending || !participants || participants.length < 2}
+          >
+            Shuffle Seeds
+          </Button>
           <Button variant="outline" onClick={() => setShowBulk(true)}>
             Bulk Add
           </Button>

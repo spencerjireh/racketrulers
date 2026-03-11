@@ -18,14 +18,7 @@ import {
 import { stripUndefined } from "@/lib/utils";
 import { generateSchedule } from "@/server/lib/schedule-generation";
 import { analyzeCascade, getGamesToClear } from "@/server/lib/bracket-cascade";
-
-function getBracketRoundLabel(roundIndex: number, totalRounds: number): string {
-  const remaining = totalRounds - roundIndex;
-  if (remaining === 1) return "Final";
-  if (remaining === 2) return "Semifinals";
-  if (remaining === 3) return "Quarterfinals";
-  return `Round ${roundIndex + 1}`;
-}
+import { getBracketRoundLabel } from "@/lib/bracket-layout";
 
 async function fetchBracketData(prisma: PrismaClient, tournamentId: string) {
   const matches = await prisma.match.findMany({

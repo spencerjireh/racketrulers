@@ -57,6 +57,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isCompleted = tournament.status === "COMPLETE";
+  const isStarted = tournament.status === "UNDERWAY" || isCompleted;
 
   const [timezone, setTimezone] = useState(tournament.timezone);
   const [format, setFormat] = useState<TournamentFormat>(tournament.format ?? "ROUND_ROBIN");
@@ -113,14 +114,19 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
       startDate: formData.get("startDate") as string,
       endDate: formData.get("endDate") as string,
       timezone,
-      format,
-      drawsAllowed,
-      scoringConfig: {
-        pointsPerSet,
-        totalSets: parseInt(totalSets),
-        deuceEnabled,
-        maxPoints,
-      },
+      // Exclude locked fields when tournament is started
+      ...(isStarted
+        ? {}
+        : {
+            format,
+            drawsAllowed,
+            scoringConfig: {
+              pointsPerSet,
+              totalSets: parseInt(totalSets),
+              deuceEnabled,
+              maxPoints,
+            },
+          }),
       scheduleConfig: {
         slotDuration: parseInt(slotDuration),
         dayStartHour,
@@ -157,7 +163,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
 
       <div className="space-y-2">
         <Label>Format</Label>
-        <Select value={format} onValueChange={(v) => setFormat(v as TournamentFormat)} disabled={isCompleted}>
+        <Select value={format} onValueChange={(v) => setFormat(v as TournamentFormat)} disabled={isStarted}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -175,7 +181,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
           id="drawsAllowed"
           checked={drawsAllowed}
           onCheckedChange={(checked) => setDrawsAllowed(checked === true)}
-          disabled={isCompleted}
+          disabled={isStarted}
         />
         <Label htmlFor="drawsAllowed" className="text-sm font-normal">
           Allow draws in matches
@@ -224,6 +230,11 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
       {/* Scoring Rules */}
       <div className="space-y-4 rounded-lg border p-4">
         <h3 className="text-sm font-semibold">Scoring Rules</h3>
+        {isStarted && !isCompleted && (
+          <p className="text-xs text-muted-foreground">
+            Format and scoring rules are locked after the tournament starts.
+          </p>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -235,7 +246,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
               max={50}
               value={pointsPerSet}
               onChange={(e) => setPointsPerSet(parseInt(e.target.value) || 21)}
-              disabled={isCompleted}
+              disabled={isStarted}
             />
           </div>
           <div className="space-y-2">
@@ -243,7 +254,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
             <Select
               value={totalSets}
               onValueChange={setTotalSets}
-              disabled={isCompleted}
+              disabled={isStarted}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -267,7 +278,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
               max={50}
               value={maxPoints}
               onChange={(e) => setMaxPoints(parseInt(e.target.value) || 30)}
-              disabled={isCompleted}
+              disabled={isStarted}
             />
           </div>
           <div className="flex items-center gap-2 pt-6">
@@ -275,7 +286,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
               id="deuceEnabled"
               checked={deuceEnabled}
               onCheckedChange={(checked) => setDeuceEnabled(checked === true)}
-              disabled={isCompleted}
+              disabled={isStarted}
             />
             <Label htmlFor="deuceEnabled" className="text-sm font-normal">
               Enable deuce (2-point lead required)

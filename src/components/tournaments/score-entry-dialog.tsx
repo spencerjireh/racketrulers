@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,13 +119,13 @@ export function ScoreEntryDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Enter Set Scores</DialogTitle>
-          <DialogDescription>Enter the set scores for this match.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto max-h-[70vh]">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Enter Set Scores</SheetTitle>
+          <SheetDescription>Enter the set scores for this match.</SheetDescription>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
           {/* Team headers */}
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-medium">
             <span className="text-center truncate">
@@ -225,7 +225,7 @@ export function ScoreEntryDialog({
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

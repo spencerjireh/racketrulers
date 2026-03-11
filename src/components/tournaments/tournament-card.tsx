@@ -7,6 +7,7 @@ interface TournamentCardProps {
   tournament: {
     id: string;
     name: string;
+    slug: string;
     status: "PENDING" | "UNDERWAY" | "COMPLETE";
     startDate: Date;
     endDate: Date;
@@ -19,6 +20,7 @@ interface TournamentCardProps {
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
+  const { slug } = tournament;
   const start = new Date(tournament.startDate);
   const end = new Date(tournament.endDate);
 
@@ -58,7 +60,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
             </p>
           </div>
           <Button asChild size="sm">
-            <Link href={`/dashboard/tournaments/${tournament.id}/manage`}>
+            <Link href={`/tournaments/${slug}/bracket`}>
               {tournament.status === "PENDING" ? "Setup" : "Manage"}
             </Link>
           </Button>
