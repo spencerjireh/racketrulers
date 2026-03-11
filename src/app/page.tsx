@@ -65,8 +65,9 @@ export default function HomePage() {
           >
             <span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">
               RacketRulers.
-            </span>{" "}
-            Compete and coach like a pro.
+            </span>
+            <br />
+            Book a coach. Compete like a pro.
           </h1>
 
           {/* Subtext */}
