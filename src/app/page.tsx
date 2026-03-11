@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { RacketRulersLogo } from "@/components/racketrulers-logo";
+import { SiteHeader } from "@/components/public/site-header";
 import { Trophy, Zap, Calendar, Users, ArrowRight } from "lucide-react";
 
 const features = [
@@ -33,20 +34,7 @@ const features = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* ─── Navigation ─── */}
-      <header className="fixed top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <RacketRulersLogo size={36} variant="full" />
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/signup">Sign up</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* ─── Hero ─── */}
       <section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden pb-16">
@@ -70,16 +58,6 @@ export default function HomePage() {
             Book a coach. Compete like a pro.
           </h1>
 
-          {/* Subtext */}
-          <p
-            className="animate-fade-up mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl"
-            style={{ animationDelay: "0.2s" }}
-          >
-            The all-in-one platform for badminton coaching sessions and
-            tournaments. Set scoring, court management, live scores, brackets --
-            everything you need.
-          </p>
-
           {/* CTAs */}
           <div
             className="animate-fade-up mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
@@ -90,7 +68,7 @@ export default function HomePage() {
               className="glow-primary h-12 px-8 text-base"
               asChild
             >
-              <Link href="/tournaments?tab=coaches">Book a Coach</Link>
+              <Link href="/book">Book a Coach</Link>
             </Button>
             <Button
               size="lg"
@@ -173,7 +151,7 @@ export default function HomePage() {
                 className="glow-primary h-12 px-8 text-base"
                 asChild
               >
-                <Link href="/tournaments?tab=coaches">Book a Coach</Link>
+                <Link href="/book">Book a Coach</Link>
               </Button>
               <Button
                 size="lg"

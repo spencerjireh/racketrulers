@@ -5,9 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  LayoutDashboard,
   Calendar,
-  Users,
   LogOut,
   Menu,
   Trophy,
@@ -18,7 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -42,19 +39,14 @@ interface DashboardShellProps {
 
 const navItems = [
   {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
+    title: "My Tournaments",
+    href: "/dashboard/tournaments",
+    icon: Trophy,
   },
   {
     title: "Coach Scheduler",
     href: "/dashboard/coach",
     icon: Calendar,
-  },
-  {
-    title: "My Tournaments",
-    href: "/dashboard/tournaments",
-    icon: Trophy,
   },
 ];
 
@@ -63,8 +55,7 @@ function NavContent({ pathname }: { pathname: string }) {
     <nav className="flex flex-col gap-1">
       {navItems.map((item) => {
         const isActive =
-          pathname === item.href ||
-          (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          pathname === item.href || pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
@@ -127,13 +118,6 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center gap-2 text-destructive"
