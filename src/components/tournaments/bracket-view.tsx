@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useTRPC } from "@/lib/trpc/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Minus, RotateCcw } from "lucide-react";
+import { Plus, Minus, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MatchCard, type MatchCardGame } from "./match-card";
 import { ScoreEntryDialog } from "./score-entry-dialog";
@@ -34,8 +35,25 @@ export function BracketView({
 }: BracketViewProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1.0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const config = scoringConfig ?? DEFAULT_SCORING_CONFIG;
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      containerRef.current.requestFullscreen().catch(() => {});
+    }
+  }, []);
 
   const queryOptions = interactive
     ? trpc.matches.getBracketData.queryOptions({ tournamentId })
@@ -131,7 +149,7 @@ export function BracketView({
 
   return (
     <TooltipProvider>
-      <div className="relative">
+      <div ref={containerRef} className={cn("relative", isFullscreen && "bg-background p-4 overflow-auto")}>
         {/* Zoom controls */}
         <div className="absolute top-0 right-0 z-10 flex items-center gap-1 bg-background/80 backdrop-blur rounded-lg border p-1">
           <Button
@@ -177,6 +195,18 @@ export function BracketView({
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-3.5 w-3.5" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" />
+            )}
+          </Button>
         </div>
 
         {/* Scrollable bracket container */}
