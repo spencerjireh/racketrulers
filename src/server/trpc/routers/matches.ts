@@ -96,15 +96,31 @@ async function advanceWinner(
   matchId: string,
   winnerId: string
 ): Promise<void> {
+  // Determine the loser of this match
+  const completedMatch = await tx.match.findUnique({
+    where: { id: matchId },
+    select: { participant1Id: true, participant2Id: true },
+  });
+  const loserId =
+    completedMatch?.participant1Id === winnerId
+      ? completedMatch?.participant2Id
+      : completedMatch?.participant1Id;
+
   const nextMatches = await tx.match.findMany({
     where: { OR: [{ feederMatch1Id: matchId }, { feederMatch2Id: matchId }] },
   });
   for (const next of nextMatches) {
     if (next.feederMatch1Id === matchId) {
-      await tx.match.update({ where: { id: next.id }, data: { participant1Id: winnerId } });
+      const advancee = next.feederMatch1IsLoser ? loserId : winnerId;
+      if (advancee) {
+        await tx.match.update({ where: { id: next.id }, data: { participant1Id: advancee } });
+      }
     }
     if (next.feederMatch2Id === matchId) {
-      await tx.match.update({ where: { id: next.id }, data: { participant2Id: winnerId } });
+      const advancee = next.feederMatch2IsLoser ? loserId : winnerId;
+      if (advancee) {
+        await tx.match.update({ where: { id: next.id }, data: { participant2Id: advancee } });
+      }
     }
   }
 }
@@ -201,11 +217,15 @@ export const matchesRouter = createTRPCRouter({
       }
 
       // Fetch current match state (used for winner derivation + cascade check)
-      const currentMatch = await ctx.prisma.match.findUnique({
-        where: { id: input.id },
+      const currentMatch = await ctx.prisma.match.findFirst({
+        where: { id: input.id, tournamentId: input.tournamentId },
         include: { tournament: { select: { format: true } } },
       });
       if (!currentMatch) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (!currentMatch.participant1Id || !currentMatch.participant2Id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot score a match with unassigned participants" });
+      }
 
       const newWinnerId =
         validation.setsWon.team1 > validation.setsWon.team2
@@ -340,8 +360,8 @@ export const matchesRouter = createTRPCRouter({
       const data: Record<string, unknown> = { status: input.status };
 
       if (input.status === "FORFEIT" && input.forfeitWinnerId) {
-        const match = await ctx.prisma.match.findUnique({
-          where: { id: input.id },
+        const match = await ctx.prisma.match.findFirst({
+          where: { id: input.id, tournamentId: input.tournamentId },
         });
         if (!match) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -397,6 +417,12 @@ export const matchesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
+      const match = await ctx.prisma.match.findFirst({
+        where: { id: input.id, tournamentId: input.tournamentId },
+        select: { id: true },
+      });
+      if (!match) throw new TRPCError({ code: "NOT_FOUND" });
+
       const data = stripUndefined({
         scheduledAt: input.scheduledAt !== undefined ? new Date(input.scheduledAt) : undefined,
         locationId: input.locationId,
@@ -435,6 +461,14 @@ export const matchesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
+      const matchIds = input.updates.map((u) => u.matchId);
+      const validCount = await ctx.prisma.match.count({
+        where: { id: { in: matchIds }, tournamentId: input.tournamentId },
+      });
+      if (validCount !== matchIds.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "One or more matches do not belong to this tournament" });
+      }
+
       const results = await ctx.prisma.$transaction(
         input.updates.map((update) => {
           const data: Record<string, unknown> = {};
@@ -469,8 +503,8 @@ export const matchesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyTournamentOwnership(ctx.prisma, input.tournamentId, ctx.userId);
 
-      const match = await ctx.prisma.match.findUnique({
-        where: { id: input.id },
+      const match = await ctx.prisma.match.findFirst({
+        where: { id: input.id, tournamentId: input.tournamentId },
         include: { tournament: { select: { format: true } } },
       });
       if (!match) throw new TRPCError({ code: "NOT_FOUND" });

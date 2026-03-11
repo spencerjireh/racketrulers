@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateSingleElimGames } from "@/server/lib/game-generation";
+import { generateSingleElimGames, generateDoubleElimGames } from "@/server/lib/game-generation";
 import { computeBracketLayout } from "@/lib/bracket-layout";
 
 describe("generateSingleElimGames", () => {
@@ -118,6 +118,96 @@ describe("generateSingleElimGames", () => {
       (g) => g.bracketRound === 0 && (g.participant1Id === null || g.participant2Id === null)
     );
     expect(byeGames.length).toBe(1);
+  });
+});
+
+describe("generateDoubleElimGames", () => {
+  it("generates correct feeder indices and isLoser flags for 4 teams", () => {
+    const teams = ["a", "b", "c", "d"];
+    const games = generateDoubleElimGames(teams, true);
+
+    // All games should have bracketType set
+    for (const g of games) {
+      expect(g.bracketType).toBeDefined();
+      expect(["winners", "losers", "grand_finals"]).toContain(g.bracketType);
+    }
+
+    // WB Round 1: 2 games (indices 0, 1) -- no feeders
+    expect(games[0].bracketType).toBe("winners");
+    expect(games[0].feederIndex1).toBeUndefined();
+    expect(games[1].bracketType).toBe("winners");
+
+    // WB Final (index 2) feeds from WB R1
+    expect(games[2].bracketType).toBe("winners");
+    expect(games[2].feederIndex1).toBe(0);
+    expect(games[2].feederIndex2).toBe(1);
+
+    // LB Round 1 (index 3) -- losers from WB R1
+    expect(games[3].bracketType).toBe("losers");
+    expect(games[3].feeder1IsLoser).toBe(true);
+    expect(games[3].feeder2IsLoser).toBe(true);
+    expect(games[3].feederIndex1).toBe(0);
+    expect(games[3].feederIndex2).toBe(1);
+
+    // LB drop-down (index 4) -- LB survivor vs WB loser
+    expect(games[4].bracketType).toBe("losers");
+    expect(games[4].feeder2IsLoser).toBe(true);
+
+    // Grand Finals game 1
+    const gf1 = games.find(
+      (g, i) => g.bracketType === "grand_finals" && i === games.length - 2
+    )!;
+    expect(gf1).toBeDefined();
+    expect(gf1.feederIndex1).toBeDefined();
+    expect(gf1.feederIndex2).toBeDefined();
+
+    // Reset match
+    const gfReset = games[games.length - 1];
+    expect(gfReset.bracketType).toBe("grand_finals");
+    expect(gfReset.feederIndex1).toBe(games.length - 2);
+  });
+
+  it("generates correct game count and feeder chain for 8 teams", () => {
+    const teams = Array.from({ length: 8 }, (_, i) => `t${i + 1}`);
+    const games = generateDoubleElimGames(teams, true);
+
+    // 8-team double elim: WB(4+2+1) + LB(2+2+1+1) + GF(1+1) = 15
+    expect(games).toHaveLength(15);
+
+    // Every game beyond WB R1 should have at least one feeder index
+    const wbR1Games = games.filter(
+      (g) => g.bracketType === "winners" && g.feederIndex1 === undefined
+    );
+    expect(wbR1Games).toHaveLength(4);
+
+    // All LB games should have feeder indices
+    const lbGames = games.filter((g) => g.bracketType === "losers");
+    for (const g of lbGames) {
+      expect(g.feederIndex1).toBeDefined();
+    }
+
+    // GF games should have feeders
+    const gfGames = games.filter((g) => g.bracketType === "grand_finals");
+    expect(gfGames).toHaveLength(2);
+    expect(gfGames[0].feederIndex1).toBeDefined();
+    expect(gfGames[0].feederIndex2).toBeDefined();
+  });
+
+  it("generates without reset match when disabled", () => {
+    const teams = ["a", "b", "c", "d"];
+    const gamesWithReset = generateDoubleElimGames(teams, true);
+    const gamesNoReset = generateDoubleElimGames(teams, false);
+
+    expect(gamesWithReset.length).toBe(gamesNoReset.length + 1);
+
+    const gfWithReset = gamesWithReset.filter(
+      (g) => g.bracketType === "grand_finals"
+    );
+    const gfNoReset = gamesNoReset.filter(
+      (g) => g.bracketType === "grand_finals"
+    );
+    expect(gfWithReset).toHaveLength(2);
+    expect(gfNoReset).toHaveLength(1);
   });
 });
 

@@ -185,6 +185,9 @@ model Match {
   feederMatch2   Match?  @relation("FeederMatch2", fields: [feederMatch2Id], references: [id])
   fedByMatch2    Match[] @relation("FeederMatch2")
 
+  feederMatch1IsLoser Boolean @default(false) @map("feeder_match_1_is_loser")
+  feederMatch2IsLoser Boolean @default(false) @map("feeder_match_2_is_loser")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

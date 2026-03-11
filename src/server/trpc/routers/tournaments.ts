@@ -115,7 +115,10 @@ export const tournamentsRouter = createTRPCRouter({
         },
         include: {
           locations: true,
-          participants: { orderBy: { seed: "asc" } },
+          participants: {
+            orderBy: { seed: "asc" },
+            select: { id: true, name: true, seed: true },
+          },
           _count: { select: { matches: true } },
         },
       });
@@ -326,7 +329,7 @@ export const tournamentsRouter = createTRPCRouter({
             ids.push(created.id);
           }
 
-          // Link feeder matches
+          // Link feeder matches with isLoser flags
           for (let i = 0; i < gameSeeds.length; i++) {
             const seed = gameSeeds[i];
             if (seed.feederIndex1 != null || seed.feederIndex2 != null) {
@@ -335,6 +338,24 @@ export const tournamentsRouter = createTRPCRouter({
                 data: {
                   feederMatch1Id: seed.feederIndex1 != null ? ids[seed.feederIndex1] : undefined,
                   feederMatch2Id: seed.feederIndex2 != null ? ids[seed.feederIndex2] : undefined,
+                  feederMatch1IsLoser: seed.feeder1IsLoser ?? false,
+                  feederMatch2IsLoser: seed.feeder2IsLoser ?? false,
+                },
+              });
+            }
+          }
+
+          // Auto-complete bye matches (exactly one participant is null)
+          for (let i = 0; i < gameSeeds.length; i++) {
+            const seed = gameSeeds[i];
+            if ((seed.participant1Id === null) !== (seed.participant2Id === null)) {
+              await tx.match.update({
+                where: { id: ids[i] },
+                data: {
+                  status: "COMPLETE" as const,
+                  scoreParticipant1: seed.participant1Id ? 1 : 0,
+                  scoreParticipant2: seed.participant2Id ? 1 : 0,
+                  setScores: [{ team1: seed.participant1Id ? 21 : 0, team2: seed.participant2Id ? 21 : 0 }],
                 },
               });
             }
@@ -366,7 +387,13 @@ export const tournamentsRouter = createTRPCRouter({
   finalize: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
+      const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
+      if (tournament.status !== "UNDERWAY") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Only in-progress tournaments can be finalized",
+        });
+      }
       return ctx.prisma.tournament.update({
         where: { id: input.id },
         data: { status: "COMPLETE" },
@@ -376,7 +403,13 @@ export const tournamentsRouter = createTRPCRouter({
   reopen: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
+      const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
+      if (tournament.status !== "COMPLETE") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Only completed tournaments can be reopened",
+        });
+      }
       return ctx.prisma.tournament.update({
         where: { id: input.id },
         data: { status: "UNDERWAY" },

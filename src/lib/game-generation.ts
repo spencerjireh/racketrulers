@@ -16,6 +16,10 @@ export interface MatchSeed {
   /** Which bracket round this game belongs to (0-based) */
   bracketRound?: number;
   bracketType?: "winners" | "losers" | "grand_finals";
+  /** If true, feeder match 1 sends its loser (not winner) into this slot */
+  feeder1IsLoser?: boolean;
+  /** If true, feeder match 2 sends its loser (not winner) into this slot */
+  feeder2IsLoser?: boolean;
 }
 
 /**
@@ -165,6 +169,9 @@ export function generateDoubleElimGames(
         participant1Id: auto1,
         participant2Id: auto2,
         roundPosition: position++,
+        feederIndex1: prev[i],
+        feederIndex2: prev[i + 1],
+        bracketRound: round,
         bracketType: "winners",
       });
     }
@@ -174,7 +181,7 @@ export function generateDoubleElimGames(
   // --- Losers Bracket ---
   const lbRoundGames: Map<number, number[]> = new Map();
 
-  // LB Round 1: losers from WB Round 1 (half the games)
+  // LB Round 1: losers from WB Round 1 paired together
   const wbR1 = wbRoundGames.get(0)!;
   const lbR1Indices: number[] = [];
   for (let i = 0; i < wbR1.length; i += 2) {
@@ -183,6 +190,10 @@ export function generateDoubleElimGames(
       participant1Id: null,
       participant2Id: null,
       roundPosition: position++,
+      feederIndex1: wbR1[i],
+      feederIndex2: wbR1[i + 1],
+      feeder1IsLoser: true,
+      feeder2IsLoser: true,
       bracketType: "losers",
     });
   }
@@ -203,6 +214,9 @@ export function generateDoubleElimGames(
         participant1Id: null,
         participant2Id: null,
         roundPosition: position++,
+        feederIndex1: prevLb[i],
+        feederIndex2: wbLosersFromRound[i],
+        feeder2IsLoser: true,
         bracketType: "losers",
       });
     }
@@ -218,6 +232,8 @@ export function generateDoubleElimGames(
           participant1Id: null,
           participant2Id: null,
           roundPosition: position++,
+          feederIndex1: dropIndices[i],
+          feederIndex2: dropIndices[i + 1],
           bracketType: "losers",
         });
       }
@@ -227,10 +243,17 @@ export function generateDoubleElimGames(
   }
 
   // --- Grand Finals ---
+  const wbFinalIdx = wbRoundGames.get(wbRounds - 1)![0];
+  const lastLbRound = lbRoundGames.get(lbRound - 1)!;
+  const lbFinalIdx = lastLbRound[lastLbRound.length - 1];
+
+  const gf1Idx = games.length;
   games.push({
     participant1Id: null,
     participant2Id: null,
     roundPosition: position++,
+    feederIndex1: wbFinalIdx,
+    feederIndex2: lbFinalIdx,
     bracketType: "grand_finals",
   });
 
@@ -240,6 +263,7 @@ export function generateDoubleElimGames(
       participant1Id: null,
       participant2Id: null,
       roundPosition: position++,
+      feederIndex1: gf1Idx,
       bracketType: "grand_finals",
     });
   }
