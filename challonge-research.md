@@ -2,6 +2,7 @@
 
 Research conducted on 2026-03-10 by navigating challonge.com with Playwright.
 Updated on 2026-03-11: verified all sections against live Challonge site + compared against RacketRulers codebase.
+Re-verified on 2026-03-11: created a test tournament end-to-end via Playwright MCP to audit every section. 95% accurate; corrections applied below.
 
 ---
 
@@ -18,9 +19,11 @@ Challonge uses a **single-page-per-concern** pattern. Each tournament lives at a
 | Announcements | `/{slug}/announcements` | Tournament announcements feed | Public |
 | Log | `/{slug}/log` | Activity feed (created, started, score updates) | Public |
 | Stations | `/{slug}/stations` | Court/station management and auto-assignment | Admin only |
-| Report Scores | `/{slug}/report_scores` | Alternative score reporting interface | Admin only |
+| Report Scores | `/{slug}/report_scores` | Alternative score reporting interface | Admin only (only visible after tournament started) |
 | Issues | `/{slug}/issues` | Tournament issues tracker | Admin only |
-| Fullscreen | `/{slug}/fullscreen` | Full-screen bracket view | Public |
+| Fullscreen | `/{slug}/fullscreen` | Full-screen bracket view | Public (bracket button only, not in nav) |
+
+Nav items with activity show counts in parentheses, e.g. "Announcements (0)", "Log (3)", "Issues (0)".
 
 The **admin bar** at the top of the bracket page shows contextual guidance:
 - Pre-participants: "add participants"
@@ -86,7 +89,7 @@ The form is organized into collapsible sections:
 - Allow custom fields in Predictions (requires predictions activated)
 - Disclaimer: "Experimental features are subject to change. Additionally, in the future these features might only be available to those with a Challonge Premier subscription."
 
-#### Advanced Options (collapsed by default, 4 sub-tabs)
+#### Advanced Options (collapsed by default, 4 sub-tabs on creation; 5 sub-tabs post-creation)
 
 **Bracket tab:**
 - Show customizable round labels (checked by default)
@@ -175,6 +178,7 @@ Clicking a match opens an **inline panel adjacent to the bracket** (not a slide-
   - Score column (number spinbutton per participant per set)
 - **"Verify the winner"** section: clickable player name buttons to confirm winner
 - **"Submit scores"** button
+- If no winner is selected, a confirmation dialog appears: "Before you continue -- No winner is selected but you can still save it as-is" with Submit/Cancel buttons
 
 #### Tab 2: Match Details
 - Player A vs Player B (with avatars)
@@ -201,6 +205,12 @@ Same form as creation but with some fields **disabled after start**:
 - Bracket predictions: disabled (shows "Winners bracket only" note)
 
 Save button changes from "Save and Continue" to **"Save Changes"**.
+
+The Registration section is **not shown** on the settings page after the tournament has started.
+
+#### Reset or Delete (Advanced Options tab, post-creation only)
+- **Reset the Bracket**: "If you need to add or reorder participants, you can reset your bracket to take a step back. This is a destructive operation that will **clear all scores and attachments**, so be careful!" with a "Reset" link
+- **Delete Tournament**: "Deleting this tournament will remove all traces of it, and there's no undo." with a "Delete" link (triggers browser confirm dialog)
 
 ### Additional settings visible post-creation:
 
@@ -306,10 +316,11 @@ URL: `/dashboard`
 - **"Create a Tournament"** dropdown button:
   - Tournament (bracket)
   - Race
-- **Status filter tabs**: All, Pending, In Progress, Complete (with count badges)
+- **Status filter tabs**: All, Pending, In Progress, Complete (with count badges) -- *Note: not observed during re-verification (tournament list stuck loading); may require tournaments to exist or may have been removed*
 - **Search bar**: "Search your tournaments" text input
+- **Search Tournaments** dropdown with additional options: Search Tournaments, Search Events, Search Communities, Discover Communities
 - Tournament list: each item shows host avatar, tournament name, format, game, participant count
-- Footer: links to About, Pricing, Knowledge Base, Contact, Partners, Organized Play, API
+- Footer: links to About, Pricing, Knowledge Base, Contact, Partners, Organized Play, API, Bracket Generator
 
 ---
 
@@ -329,7 +340,7 @@ URL: `/dashboard`
 ### Score Reporting UX
 - Click directly on a match in the bracket to open inline score panel
 - Set-based scoring (can add multiple sets via "Add a set")
-- Must verify/confirm the winner explicitly before submitting
+- Must verify/confirm the winner explicitly before submitting (confirmation dialog warns if no winner selected)
 - Submit updates the bracket in real-time
 
 ### Bracket Visualization
