@@ -21,7 +21,6 @@ interface PublicTournamentCardProps {
 }
 
 function getTournamentDisplayStatus(tournament: PublicTournamentCardProps["tournament"]) {
-  if (tournament.status === "COMPLETE") return { label: "Completed", variant: "secondary" as const };
   const now = new Date();
   const start = new Date(tournament.startDate);
   const end = new Date(tournament.endDate);

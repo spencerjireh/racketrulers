@@ -8,7 +8,7 @@ interface TournamentCardProps {
     id: string;
     name: string;
     slug: string;
-    status: "PENDING" | "UNDERWAY" | "COMPLETE";
+    status: "PENDING" | "UNDERWAY";
     startDate: Date;
     endDate: Date;
     _count: {
@@ -24,19 +24,8 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
   const start = new Date(tournament.startDate);
   const end = new Date(tournament.endDate);
 
-  const statusLabel =
-    tournament.status === "PENDING"
-      ? "Setup"
-      : tournament.status === "UNDERWAY"
-        ? "Active"
-        : "Completed";
-
-  const statusVariant =
-    tournament.status === "PENDING"
-      ? "outline"
-      : tournament.status === "UNDERWAY"
-        ? "default"
-        : "secondary";
+  const statusLabel = tournament.status === "PENDING" ? "Setup" : "Active";
+  const statusVariant = tournament.status === "PENDING" ? "outline" : "default";
 
   return (
     <Card>

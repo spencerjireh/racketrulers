@@ -4,13 +4,12 @@ interface TournamentHeaderProps {
   name: string;
   startDate: string | Date;
   endDate: string | Date;
-  status: "PENDING" | "UNDERWAY" | "COMPLETE";
+  status: "PENDING" | "UNDERWAY";
 }
 
 const STATUS_DISPLAY = {
   PENDING: { label: "Upcoming", variant: "outline" as const },
   UNDERWAY: { label: "Live", variant: "default" as const },
-  COMPLETE: { label: "Completed", variant: "secondary" as const },
 };
 
 export function TournamentHeader({

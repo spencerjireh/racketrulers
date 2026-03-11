@@ -18,9 +18,9 @@ model User {
   image         String?
   password      String?
 
-  accounts    Account[]
-  sessions    Session[]
-  tournaments Tournament[]
+  accounts     Account[]
+  sessions     Session[]
+  tournaments  Tournament[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -77,7 +77,6 @@ model VerificationToken {
 enum TournamentStatus {
   PENDING
   UNDERWAY
-  COMPLETE
 
   @@map("event_status")
 }
@@ -93,16 +92,16 @@ model Tournament {
   endDate     DateTime         @map("end_date")
 
   format       TournamentFormat?
-  drawsAllowed Boolean @default(false) @map("draws_allowed")
+  drawsAllowed Boolean           @default(false) @map("draws_allowed")
 
   // Challonge-aligned fields
-  type                 String  @default("SINGLE_STAGE")
-  thirdPlaceMatch      Boolean @default(false) @map("third_place_match")
-  grandFinalsModifier  String? @map("grand_finals_modifier")
-  rankBy               String  @default("MATCH_WINS") @map("rank_by")
-  hideSeeds            Boolean @default(false) @map("hide_seeds")
-  quickAdvance         Boolean @default(false) @map("quick_advance")
-  showStandings        Boolean @default(true) @map("show_standings")
+  type                String  @default("SINGLE_STAGE")
+  thirdPlaceMatch     Boolean @default(false) @map("third_place_match")
+  grandFinalsModifier String? @map("grand_finals_modifier")
+  rankBy              String  @default("MATCH_WINS") @map("rank_by")
+  hideSeeds           Boolean @default(false) @map("hide_seeds")
+  quickAdvance        Boolean @default(false) @map("quick_advance")
+  showStandings       Boolean @default(true) @map("show_standings")
 
   pointsConfig     Json @default("{\"win\": 2, \"draw\": 1, \"loss\": 0}") @map("points_config")
   scoringConfig    Json @default("{\"pointsPerSet\": 21, \"totalSets\": 3, \"deuceEnabled\": true, \"maxPoints\": 30}") @map("scoring_config")
@@ -152,16 +151,16 @@ enum MatchType {
 }
 
 model Match {
-  id             String      @id @default(cuid())
-  status         MatchStatus @default(PENDING) @map("status")
-  matchType      MatchType   @default(SINGLES) @map("match_type")
-  roundPosition  Int?        @map("round_position")
-  round          Int?        @map("round")
-  scheduledAt    DateTime?   @map("scheduled_at")
-  durationMinutes Int        @default(60) @map("duration_minutes")
+  id              String      @id @default(cuid())
+  status          MatchStatus @default(PENDING) @map("status")
+  matchType       MatchType   @default(SINGLES) @map("match_type")
+  roundPosition   Int?        @map("round_position")
+  round           Int?        @map("round")
+  scheduledAt     DateTime?   @map("scheduled_at")
+  durationMinutes Int         @default(60) @map("duration_minutes")
 
-  scoreParticipant1 Int? @map("score_participant1")
-  scoreParticipant2 Int? @map("score_participant2")
+  scoreParticipant1 Int?  @map("score_participant1")
+  scoreParticipant2 Int?  @map("score_participant2")
   setScores         Json? @map("set_scores")
 
   participant1Id String?      @map("participant1_id")
@@ -250,7 +249,7 @@ model CoachAvailability {
   id        String @id @default(cuid())
   dayOfWeek Int    @map("day_of_week") // 0-6, Monday=0
   startTime String @map("start_time") // e.g. "09:00"
-  endTime   String @map("end_time")   // e.g. "12:00"
+  endTime   String @map("end_time") // e.g. "12:00"
 
   coachProfileId String       @map("coach_profile_id")
   coachProfile   CoachProfile @relation(fields: [coachProfileId], references: [id], onDelete: Cascade)

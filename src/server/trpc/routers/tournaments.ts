@@ -172,13 +172,6 @@ export const tournamentsRouter = createTRPCRouter({
         ctx.userId
       );
 
-      if (tournament.status === "COMPLETE") {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Cannot update a completed tournament",
-        });
-      }
-
       // Lock structural fields once the tournament is underway
       if (tournament.status === "UNDERWAY") {
         const lockedFields = ["format", "drawsAllowed", "scoringConfig", "thirdPlaceMatch", "grandFinalsModifier"] as const;
@@ -380,47 +373,15 @@ export const tournamentsRouter = createTRPCRouter({
       return ctx.prisma.tournament.findFirst({ where: { id: input.id } });
     }),
 
-  finalize: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
-      if (tournament.status !== "UNDERWAY") {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Only in-progress tournaments can be finalized",
-        });
-      }
-      return ctx.prisma.tournament.update({
-        where: { id: input.id },
-        data: { status: "COMPLETE" },
-      });
-    }),
-
-  reopen: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
-      if (tournament.status !== "COMPLETE") {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Only completed tournaments can be reopened",
-        });
-      }
-      return ctx.prisma.tournament.update({
-        where: { id: input.id },
-        data: { status: "UNDERWAY" },
-      });
-    }),
-
   reset: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const tournament = await verifyTournamentOwnership(ctx.prisma, input.id, ctx.userId);
 
-      if (tournament.status !== "UNDERWAY" && tournament.status !== "COMPLETE") {
+      if (tournament.status !== "UNDERWAY") {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Only started or completed tournaments can be reset",
+          message: "Only started tournaments can be reset",
         });
       }
 
@@ -477,7 +438,8 @@ export const tournamentsRouter = createTRPCRouter({
         where.startDate = { lte: now };
         where.endDate = { gte: now };
       } else if (input.status === "completed") {
-        where.status = "COMPLETE";
+        where.status = "UNDERWAY";
+        where.endDate = { lt: now };
       }
 
       const [tournaments, totalCount] = await Promise.all([

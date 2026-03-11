@@ -18,7 +18,6 @@ export function SettingsTabContent({ tournamentId }: { tournamentId: string }) {
   if (isLoading) return <LoadingState text="Loading settings..." />;
   if (!tournament) return <p className="text-sm text-muted-foreground">Tournament not found.</p>;
 
-  const isCompleted = tournament.status === "COMPLETE";
   const pointsConfig = (tournament.pointsConfig as { win: number; draw: number; loss: number } | null) ?? {
     win: 3,
     draw: 1,
@@ -37,7 +36,6 @@ export function SettingsTabContent({ tournamentId }: { tournamentId: string }) {
         <PointsConfigForm
           tournamentId={tournamentId}
           pointsConfig={pointsConfig}
-          disabled={isCompleted}
         />
       </section>
 
@@ -49,7 +47,7 @@ export function SettingsTabContent({ tournamentId }: { tournamentId: string }) {
       <section className="border-t pt-6">
         <h2 className="text-lg font-semibold mb-4 text-destructive">Danger Zone</h2>
         <div className="space-y-4">
-          {(tournament.status === "UNDERWAY" || tournament.status === "COMPLETE") && (
+          {tournament.status === "UNDERWAY" && (
             <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
               <div>
                 <p className="text-sm font-medium">Reset Tournament</p>

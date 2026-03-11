@@ -55,8 +55,7 @@ const TIEBREAKER_OPTIONS = [
 export function TournamentSettingsForm({ tournament }: TournamentSettingsFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const isCompleted = tournament.status === "COMPLETE";
-  const isStarted = tournament.status === "UNDERWAY" || isCompleted;
+  const isStarted = tournament.status === "UNDERWAY";
 
   const [format, setFormat] = useState<TournamentFormat>(tournament.format ?? "ROUND_ROBIN");
   const [drawsAllowed, setDrawsAllowed] = useState(tournament.drawsAllowed ?? false);
@@ -143,7 +142,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
           id="name"
           name="name"
           defaultValue={tournament.name}
-          disabled={isCompleted}
         />
       </div>
 
@@ -154,7 +152,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
           name="description"
           defaultValue={tournament.description ?? ""}
           placeholder="Add a description for your tournament..."
-          disabled={isCompleted}
         />
       </div>
 
@@ -193,7 +190,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
             name="startDate"
             type="date"
             defaultValue={formatDateForInput(tournament.startDate)}
-            disabled={isCompleted}
           />
         </div>
         <div className="space-y-2">
@@ -203,7 +199,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
             name="endDate"
             type="date"
             defaultValue={formatDateForInput(tournament.endDate)}
-            disabled={isCompleted}
           />
         </div>
       </div>
@@ -211,7 +206,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
       {/* Scoring Rules */}
       <div className="space-y-4 rounded-lg border p-4">
         <h3 className="text-sm font-semibold">Scoring Rules</h3>
-        {isStarted && !isCompleted && (
+        {isStarted && (
           <p className="text-xs text-muted-foreground">
             Format and scoring rules are locked after the tournament starts.
           </p>
@@ -286,7 +281,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
             <Select
               value={slotDuration}
               onValueChange={setSlotDuration}
-              disabled={isCompleted}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -308,7 +302,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
               max={23}
               value={dayStartHour}
               onChange={(e) => setDayStartHour(parseInt(e.target.value) || 8)}
-              disabled={isCompleted}
             />
           </div>
           <div className="space-y-2">
@@ -320,7 +313,6 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
               max={24}
               value={dayEndHour}
               onChange={(e) => setDayEndHour(parseInt(e.target.value) || 20)}
-              disabled={isCompleted}
             />
           </div>
         </div>
@@ -351,7 +343,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
                     size="sm"
                     className="h-6 w-6 p-0 text-xs"
                     onClick={() => moveTiebreaker(i, "up")}
-                    disabled={i === 0 || isCompleted}
+                    disabled={i === 0}
                   >
                     ^
                   </Button>
@@ -361,7 +353,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
                     size="sm"
                     className="h-6 w-6 p-0 text-xs"
                     onClick={() => moveTiebreaker(i, "down")}
-                    disabled={i === tiebreakerOrder.length - 1 || isCompleted}
+                    disabled={i === tiebreakerOrder.length - 1}
                   >
                     v
                   </Button>
@@ -372,7 +364,7 @@ export function TournamentSettingsForm({ tournament }: TournamentSettingsFormPro
         </div>
       </div>
 
-      <Button type="submit" disabled={isCompleted || updateTournament.isPending}>
+      <Button type="submit" disabled={updateTournament.isPending}>
         {updateTournament.isPending ? "Saving..." : "Save Settings"}
       </Button>
     </form>
